@@ -24,7 +24,7 @@ export default function LeaderboardPage() {
       setLoading(false);
     };
     fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 15000);
+    const interval = setInterval(fetchLeaderboard, 5000);
     return () => clearInterval(interval);
   }, []);
 
