@@ -170,7 +170,7 @@ export default function PredictPage() {
           <Swords className="w-10 h-10 text-white/30" />
         </div>
         <h2 className="text-2xl font-bold mb-2">Predictions Locked</h2>
-        <p className="text-white/50 mb-6">
+        <p className="text-white/50 mb-6 px-4">
           Sign in to make your World Cup 2026 predictions and compete on the leaderboard.
         </p>
         <a
@@ -186,23 +186,23 @@ export default function PredictPage() {
   const activeRound = rounds.find((r) => r.id === activeTab) || rounds[0];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
       {/* Header */}
-      <div className="mb-10">
+      <div className="mb-6 sm:mb-10">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-wc-gold/20 flex items-center justify-center">
             <Swords className="w-5 h-5 text-wc-gold" />
           </div>
-          <h1 className="text-3xl font-bold">Your Predictions</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Your Predictions</h1>
         </div>
-        <p className="text-white/50 ml-[52px]">
+        <p className="text-white/50 text-sm sm:text-base ml-0 sm:ml-[52px]">
           Predict exact scores, pick your double, and watch points roll in live.
         </p>
       </div>
 
       {/* Round Tabs */}
       {rounds.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-4 sm:mb-6 scrollbar-hide">
           {rounds.map((round) => {
             const isActive = activeTab === round.id;
             const liveGlow = round.status === "LIVE" && !isActive;
@@ -210,7 +210,7 @@ export default function PredictPage() {
               <button
                 key={round.id}
                 onClick={() => setActiveTab(round.id)}
-                className={`relative px-5 py-3 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
+                className={`relative px-4 sm:px-5 py-3 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${
                   isActive
                     ? "bg-white/10 text-white border border-white/20 shadow-lg shadow-wc-gold/5"
                     : "bg-white/5 text-white/50 hover:bg-white/8 hover:text-white/70 border border-transparent"
@@ -235,10 +235,10 @@ export default function PredictPage() {
 
       {/* Round Header */}
       {activeRound && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
             <div>
-              <h2 className="text-2xl font-bold">{activeRound.name}</h2>
+              <h2 className="text-xl sm:text-2xl font-bold">{activeRound.name}</h2>
               <div className="flex items-center gap-2 mt-1">
                 {activeRound.status === "LIVE" && (
                   <span className="px-2.5 py-0.5 rounded-full bg-wc-red/10 border border-wc-red/20 text-wc-red text-xs font-bold uppercase tracking-wider flex items-center gap-1">
@@ -267,7 +267,7 @@ export default function PredictPage() {
           </div>
 
           {/* Matches Grid */}
-          <div className="grid gap-4">
+          <div className="grid gap-3 sm:gap-4">
             {activeRound.matches.map((match) => {
               const inp = inputs[match.id] || { home: "", away: "" };
               const isLocked = activeRound.status === "LIVE" || activeRound.status === "FINISHED";
@@ -291,79 +291,78 @@ export default function PredictPage() {
                     <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-wc-gold to-transparent" />
                   )}
 
-                  <div className="p-5 sm:p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-5">
-                      {/* Match Info */}
-                      <div className="flex-1">
-                        <div className="text-xs text-white/30 mb-3 uppercase tracking-wider font-semibold">
-                          {formatDate(match.matchDate)}
-                        </div>
+                  <div className="p-4 sm:p-5 lg:p-6">
+                    {/* Date */}
+                    <div className="text-xs text-white/30 mb-3 uppercase tracking-wider font-semibold">
+                      {formatDate(match.matchDate)}
+                    </div>
 
-                        <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-5">
+                      {/* Teams */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between sm:justify-center gap-2 sm:gap-4">
                           {/* Home Team */}
-                          <div className="flex-1 flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl shrink-0 border border-white/5">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center text-xl sm:text-2xl shrink-0 border border-white/5">
                               {getFlag(match.homeTeam)}
                             </div>
                             <div className="min-w-0">
-                              <div className="font-bold text-lg truncate">{match.homeTeam}</div>
-                              <div className="text-xs text-white/30">Home</div>
+                              <div className="font-bold text-base sm:text-lg truncate">{match.homeTeam}</div>
                             </div>
                           </div>
 
-                          {/* VS / Actual Score */}
-                          <div className="flex flex-col items-center gap-1 px-4">
+                          {/* VS / Score */}
+                          <div className="flex flex-col items-center gap-0.5 px-2 sm:px-4 shrink-0">
                             {isLocked && match.homeScore !== null && match.awayScore !== null ? (
-                              <div className="text-2xl font-black text-white/90 tracking-wider">
+                              <div className="text-xl sm:text-2xl font-black text-white/90 tracking-wider">
                                 {match.homeScore} - {match.awayScore}
                               </div>
                             ) : (
-                              <div className="text-sm font-bold text-white/20 uppercase tracking-widest">VS</div>
+                              <div className="text-xs sm:text-sm font-bold text-white/20 uppercase tracking-widest">VS</div>
                             )}
                             {isLocked && hasPrediction && (
-                              <div className="text-xs text-white/30">
+                              <div className="text-[10px] sm:text-xs text-white/30">
                                 You: {match.prediction?.homeScore}-{match.prediction?.awayScore}
                               </div>
                             )}
                           </div>
 
                           {/* Away Team */}
-                          <div className="flex-1 flex items-center gap-3 flex-row-reverse text-right">
-                            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl shrink-0 border border-white/5">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-row-reverse text-right">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center text-xl sm:text-2xl shrink-0 border border-white/5">
                               {getFlag(match.awayTeam)}
                             </div>
                             <div className="min-w-0">
-                              <div className="font-bold text-lg truncate">{match.awayTeam}</div>
-                              <div className="text-xs text-white/30">Away</div>
+                              <div className="font-bold text-base sm:text-lg truncate">{match.awayTeam}</div>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Divider on lg */}
+                      {/* Divider on desktop */}
                       <div className="hidden lg:block w-px h-20 bg-white/5 self-center" />
 
                       {/* Actions / Results */}
-                      <div className="flex items-center justify-center lg:justify-end gap-3 min-w-[200px]">
+                      <div className="flex items-center justify-center lg:justify-end gap-2 sm:gap-3">
                         {isLocked ? (
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
                             {pointsMeta && (
-                              <div className={`px-4 py-2 rounded-xl border ${pointsMeta.bg} ${pointsMeta.border} flex items-center gap-2`}>
+                              <div className={`px-3 sm:px-4 py-2 rounded-xl border ${pointsMeta.bg} ${pointsMeta.border} flex items-center gap-2`}>
                                 <Medal className={`w-4 h-4 ${pointsMeta.color}`} />
                                 <div>
-                                  <div className={`text-sm font-bold ${pointsMeta.color}`}>{pointsMeta.text}</div>
-                                  <div className={`text-xs ${pointsMeta.color} opacity-60`}>{match.points} pts</div>
+                                  <div className={`text-xs sm:text-sm font-bold ${pointsMeta.color}`}>{pointsMeta.text}</div>
+                                  <div className={`text-[10px] sm:text-xs ${pointsMeta.color} opacity-60`}>{match.points} pts</div>
                                 </div>
                               </div>
                             )}
                             {!pointsMeta && hasPrediction && (
-                              <div className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-white/30 text-sm font-bold flex items-center gap-2">
+                              <div className="px-3 sm:px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-white/30 text-xs sm:text-sm font-bold flex items-center gap-2">
                                 <Clock className="w-4 h-4" />
                                 Pending
                               </div>
                             )}
                             {!hasPrediction && (
-                              <div className="px-4 py-2 rounded-xl border border-wc-red/10 bg-wc-red/5 text-wc-red/70 text-sm font-bold flex items-center gap-2">
+                              <div className="px-3 sm:px-4 py-2 rounded-xl border border-wc-red/10 bg-wc-red/5 text-wc-red/70 text-xs sm:text-sm font-bold flex items-center gap-2">
                                 <XCircle className="w-4 h-4" />
                                 No Prediction
                               </div>
@@ -386,7 +385,7 @@ export default function PredictPage() {
                                     setInputs({ ...inputs, [match.id]: { ...inp, home: e.target.value } })
                                   }
                                   placeholder="0"
-                                  className="w-16 h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none focus:ring-1 focus:ring-wc-gold/20 transition"
+                                  className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none focus:ring-1 focus:ring-wc-gold/20 transition"
                                 />
                                 {hasPrediction && match.prediction?.homeScore === Number(inp.home) && inp.home !== "" && (
                                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-wc-dark" />
@@ -402,7 +401,7 @@ export default function PredictPage() {
                                     setInputs({ ...inputs, [match.id]: { ...inp, away: e.target.value } })
                                   }
                                   placeholder="0"
-                                  className="w-16 h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none focus:ring-1 focus:ring-wc-gold/20 transition"
+                                  className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none focus:ring-1 focus:ring-wc-gold/20 transition"
                                 />
                                 {hasPrediction && match.prediction?.awayScore === Number(inp.away) && inp.away !== "" && (
                                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-wc-dark" />
@@ -411,14 +410,14 @@ export default function PredictPage() {
                               <button
                                 onClick={() => savePrediction(match.id)}
                                 disabled={saving[match.id]}
-                                className="h-12 px-4 rounded-xl bg-wc-gold text-wc-dark font-bold hover:bg-wc-gold/90 transition disabled:opacity-50 flex items-center gap-1.5"
+                                className="h-12 px-3 sm:px-4 rounded-xl bg-wc-gold text-wc-dark font-bold hover:bg-wc-gold/90 transition disabled:opacity-50 flex items-center gap-1.5"
                               >
                                 {saving[match.id] ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
                                 ) : (
                                   <Save className="w-4 h-4" />
                                 )}
-                                <span className="hidden sm:inline">Save</span>
+                                <span className="hidden sm:inline text-sm">Save</span>
                               </button>
                             </div>
 
@@ -441,14 +440,14 @@ export default function PredictPage() {
 
                   {/* Locked Footer */}
                   {isLocked && (
-                    <div className="px-5 sm:px-6 py-3 bg-white/[0.02] border-t border-white/5 flex items-center justify-between">
+                    <div className="px-4 sm:px-5 lg:px-6 py-3 bg-white/[0.02] border-t border-white/5 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs text-white/30">
                         <Lock className="w-3.5 h-3.5" />
                         Predictions locked — {activeRound.status === "LIVE" ? "live scoring active" : "round completed"}
                       </div>
                       {isDoubled && (
                         <div className="text-xs text-wc-gold/60 font-medium flex items-center gap-1">
-                          <Zap className="w-3 h-3" /> 2x Multiplier Active
+                          <Zap className="w-3 h-3" /> 2x
                         </div>
                       )}
                     </div>
@@ -458,7 +457,7 @@ export default function PredictPage() {
             })}
 
             {activeRound.matches.length === 0 && (
-              <div className="text-center py-16 rounded-2xl bg-white/[0.02] border border-white/5">
+              <div className="text-center py-12 sm:py-16 rounded-2xl bg-white/[0.02] border border-white/5">
                 <Shield className="w-10 h-10 text-white/10 mx-auto mb-3" />
                 <p className="text-white/30">No matches in this round yet.</p>
                 <p className="text-white/20 text-sm mt-1">Check back later or contact the admin.</p>
@@ -469,21 +468,21 @@ export default function PredictPage() {
       )}
 
       {/* Legend */}
-      <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl">
+      <div className="mt-8 sm:mt-10 grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 max-w-2xl">
         <div className="flex items-center gap-2 text-xs text-white/30">
-          <div className="w-2 h-2 rounded-full bg-green-500" />
+          <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
           Prediction saved
         </div>
         <div className="flex items-center gap-2 text-xs text-white/30">
-          <Star className="w-3 h-3 text-wc-gold fill-wc-gold" />
-          Double pick active
+          <Star className="w-3 h-3 text-wc-gold fill-wc-gold shrink-0" />
+          Double pick
         </div>
         <div className="flex items-center gap-2 text-xs text-white/30">
-          <Trophy className="w-3 h-3 text-wc-gold" />
+          <Trophy className="w-3 h-3 text-wc-gold shrink-0" />
           Perfect = 6pts
         </div>
         <div className="flex items-center gap-2 text-xs text-white/30">
-          <Zap className="w-3 h-3 text-wc-blue" />
+          <Zap className="w-3 h-3 text-wc-blue shrink-0" />
           Correct = 3pts
         </div>
       </div>
