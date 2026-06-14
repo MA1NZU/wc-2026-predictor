@@ -1,32 +1,48 @@
-import { NextResponse } from "next/server";
-import { getUser } from "@/lib/auth";
-import { db } from "@/lib/firebase";
+import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
+import { comparePassword, signToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function POST(req: NextRequest) {
   try {
-    const payload = await getUser();
-    if (!payload) {
-      return NextResponse.json({ user: null }, { status: 401 });
+    const { email, password } = await req.json();
+
+    if (!email || !password) {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    const doc = await db.collection("users").doc(payload.userId).get();
-    if (!doc.exists) {
-      return NextResponse.json({ user: null }, { status: 401 });
+    const { data: user } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .limit(1)
+      .single();
+
+    if (!user) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const data = doc.data()!;
-    const user = {
-      id: doc.id,
-      email: data.email,
-      username: data.username,
-      isAdmin: data.isAdmin || false,
-    };
+    const valid = await comparePassword(password, user.password);
+    if (!valid) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    }
 
-    return NextResponse.json({ user });
+    const token = await signToken(user.id, user.email, user.is_admin);
+    const response = NextResponse.json({
+      user: { id: user.id, email: user.email, username: user.username, isAdmin: user.is_admin },
+    });
+    response.cookies.set("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
+
+    return response;
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ user: null }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
