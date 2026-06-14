@@ -12,7 +12,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 font-bold text-xl text-white">
           <Trophy className="w-6 h-6 text-wc-gold" />
-          <span className="hidden sm:inline">WC 2026 Predictor</span>
+          <span className="hidden sm:inline">RUNIT WC 2026</span>
         </Link>
 
         <nav className="flex items-center gap-1 sm:gap-4">
