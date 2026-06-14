@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: "RUNIT WC 2026",
   description: "Predict World Cup 2026 scores and compete with friends!",
   icons: {
-    icon: "/icon.svg",
+    icon: "/icon.png",
   },
 };
 
