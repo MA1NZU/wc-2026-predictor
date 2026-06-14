@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import {
   Swords,
@@ -37,23 +37,71 @@ type Round = {
   matches: Match[];
 };
 
-function getFlag(team: string) {
-  const flags: Record<string, string> = {
-    USA: "🇺🇸", MEX: "🇲🇽", CAN: "🇨🇦", ARG: "🇦🇷", BRA: "🇧🇷", URU: "🇺🇾",
-    COL: "🇨🇴", ECU: "🇪🇨", CHI: "🇨🇱", PAR: "🇵🇾", PER: "🇵🇪", BOL: "🇧🇴",
-    VEN: "🇻🇪", ENG: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", FRA: "🇫🇷", GER: "🇩🇪", ITA: "🇮🇹",
-    ESP: "🇪🇸", POR: "🇵🇹", NED: "🇳🇱", BEL: "🇧🇪", CRO: "🇭🇷", SRB: "🇷🇸",
-    SUI: "🇨🇭", DEN: "🇩🇰", SWE: "🇸🇪", NOR: "🇳🇴", POL: "🇵🇱", UKR: "🇺🇦",
-    TUR: "🇹🇷", WAL: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", SCO: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", IRL: "🇮🇪", AUT: "🇦🇹",
-    CZE: "🇨🇿", HUN: "🇭🇺", ROU: "🇷🇴", BUL: "🇧🇬", GRE: "🇬🇷", RUS: "🇷🇺",
-    MAR: "🇲🇦", EGY: "🇪🇬", TUN: "🇹🇳", ALG: "🇩🇿", SEN: "🇸🇳", NGA: "🇳🇬",
-    CMR: "🇨🇲", GHA: "🇬🇭", CIV: "🇨🇮", RSA: "🇿🇦", JPN: "🇯🇵", KOR: "🇰🇷",
-    CHN: "🇨🇳", AUS: "🇦🇺", IRN: "🇮🇷", KSA: "🇸🇦", QAT: "🇶🇦", UAE: "🇦🇪",
-    IRQ: "🇮🇶", UZB: "🇺🇿", IND: "🇮🇳", NZL: "🇳🇿", CRC: "🇨🇷", PAN: "🇵🇦",
-    HON: "🇭🇳", JAM: "🇯🇲", HAI: "🇭🇹", SLV: "🇸🇻", TRI: "🇹🇹", GUA: "🇬🇹",
-  };
-  const upper = team.toUpperCase().trim();
-  return flags[upper] || flags[upper.slice(0, 3)] || "🏳️";
+/* ------------------------------------------------------------------ */
+/*  Country -> ISO 2-letter code for flagcdn.com                       */
+/* ------------------------------------------------------------------ */
+const COUNTRY_CODES: Record<string, string> = {
+  USA: "us", MEXICO: "mx", CANADA: "ca", ARGENTINA: "ar", BRAZIL: "br", URUGUAY: "uy",
+  COLOMBIA: "co", ECUADOR: "ec", CHILE: "cl", PARAGUAY: "py", PERU: "pe", BOLIVIA: "bo",
+  VENEZUELA: "ve", ENGLAND: "gb-eng", FRANCE: "fr", GERMANY: "de", ITALY: "it",
+  SPAIN: "es", PORTUGAL: "pt", NETHERLANDS: "nl", BELGIUM: "be", CROATIA: "hr", SERBIA: "rs",
+  SWITZERLAND: "ch", DENMARK: "dk", SWEDEN: "se", NORWAY: "no", POLAND: "pl", UKRAINE: "ua",
+  TURKEY: "tr", WALES: "gb-wls", SCOTLAND: "gb-sct", IRELAND: "ie", AUSTRIA: "at",
+  CZECHIA: "cz", CZECH: "cz", HUNGARY: "hu", ROMANIA: "ro", BULGARIA: "bg", GREECE: "gr",
+  RUSSIA: "ru", MOROCCO: "ma", EGYPT: "eg", TUNISIA: "tn", ALGERIA: "dz", SENEGAL: "sn",
+  NIGERIA: "ng", CAMEROON: "cm", GHANA: "gh", IVORY: "ci", "CÔTE D'IVOIRE": "ci",
+  "SOUTH AFRICA": "za", JAPAN: "jp", KOREA: "kr", "SOUTH KOREA": "kr", CHINA: "cn",
+  AUSTRALIA: "au", IRAN: "ir", SAUDI: "sa", ARABIA: "sa", QATAR: "qa", EMIRATES: "ae",
+  IRAQ: "iq", UZBEKISTAN: "uz", INDIA: "in", "NEW ZEALAND": "nz", COSTA: "cr", RICA: "cr",
+  PANAMA: "pa", HONDURAS: "hn", JAMAICA: "jm", HAITI: "ht", SALVADOR: "sv", TRINIDAD: "tt",
+  GUATEMALA: "gt", MALI: "ml", BURKINA: "bf", GUINEA: "gn", ZAMBIA: "zm", KENYA: "ke",
+  "DEMOCRATIC REPUBLIC OF CONGO": "cd", CONGO: "cg", TOGO: "tg", SUDAN: "sd", LIBERIA: "lr",
+  MAURITANIA: "mr", GABON: "ga", ANGOLA: "ao", MOZAMBIQUE: "mz", MADAGASCAR: "mg",
+  PAPUA: "pg", FIJI: "fj", TAHITI: "pf", NEWCALEDONIA: "nc", OMAN: "om", JORDAN: "jo",
+  SYRIA: "sy", LEBANON: "lb", BAHRAIN: "bh", KUWAIT: "kw", YEMEN: "ye", PALESTINE: "ps",
+  AZERBAIJAN: "az", ARMENIA: "am", GEORGIA: "ge", KAZAKHSTAN: "kz", TAJIKISTAN: "tj",
+  KYRGYZSTAN: "kg", TURKMENISTAN: "tm", MONGOLIA: "mn", THAILAND: "th", VIETNAM: "vn",
+  MALAYSIA: "my", SINGAPORE: "sg", INDONESIA: "id", PHILIPPINES: "ph", MYANMAR: "mm",
+  CAMBODIA: "kh", LAOS: "la", BRUNEI: "bn", MACAU: "mo", HONG: "hk", TAIWAN: "tw",
+  PAKISTAN: "pk", BANGLADESH: "bd", SRI: "lk", NEPAL: "np", BHUTAN: "bt", MALDIVES: "mv",
+  AFGHANISTAN: "af", ESTONIA: "ee", LATVIA: "lv", LITHUANIA: "lt", FINLAND: "fi",
+  ICELAND: "is", ALBANIA: "al", BOSNIA: "ba", MONTENEGRO: "me", NORTH: "mk", MACEDONIA: "mk",
+  SLOVAKIA: "sk", SLOVENIA: "si", MOLDOVA: "md", LUXEMBOURG: "lu", ANDORRA: "ad",
+  MALTA: "mt", CYPRUS: "cy", SAN: "sm", MONACO: "mc", LIECHTENSTEIN: "li", FAROE: "fo",
+  GIBRALTAR: "gi", KOSOVO: "xk", MARTINIQUE: "mq", GUADELOUPE: "gp", FRENCH: "gf",
+  REUNION: "re", MAYOTTE: "yt", CURACAO: "cw", ARUBA: "aw", BONAIRE: "bq",
+  SURINAME: "sr", GUYANA: "gy", CUBA: "cu", DOMINICAN: "do", PUERTO: "pr",
+  VENEZUELA: "ve", BERMUDA: "bm", CANADA: "ca", USA: "us", MEXICO: "mx",
+};
+
+function getCountryCode(name: string): string {
+  const upper = name.toUpperCase().trim();
+  // Direct match first
+  if (COUNTRY_CODES[upper]) return COUNTRY_CODES[upper];
+  // Partial match fallback
+  for (const [key, code] of Object.entries(COUNTRY_CODES)) {
+    if (upper.includes(key)) return code;
+  }
+  // Default to first 2 letters as ISO guess
+  return upper.slice(0, 2).toLowerCase();
+}
+
+function FlagImage({ team, size = 40 }: { team: string; size?: number }) {
+  const code = getCountryCode(team);
+  const url = `https://flagcdn.com/w${size}/${code}.png`;
+  return (
+    <img
+      src={url}
+      alt={team}
+      width={size}
+      height={size}
+      className="rounded-lg object-cover border border-white/10 bg-white/5"
+      onError={(e) => {
+        // fallback to a generic shield icon if flag fails
+        (e.target as HTMLImageElement).style.display = "none";
+      }}
+    />
+  );
 }
 
 function formatDate(dateStr: string) {
@@ -89,12 +137,20 @@ export default function PredictPage() {
     const res = await fetch("/api/rounds", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      setRounds(data.rounds);
+      // Sort each round's matches by matchDate ascending
+      const sortedRounds = (data.rounds || []).map((r: Round) => ({
+        ...r,
+        matches: [...r.matches].sort(
+          (a: Match, b: Match) =>
+            new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
+        ),
+      }));
+      setRounds(sortedRounds);
       setInputs((prev) => {
         if (Object.keys(prev).length > 0) return prev;
         const init: Record<string, { home: string; away: string }> = {};
-        data.rounds.forEach((r: Round) => {
-          r.matches.forEach((m) => {
+        sortedRounds.forEach((r: Round) => {
+          r.matches.forEach((m: Match) => {
             if (m.prediction) {
               init[m.id] = {
                 home: String(m.prediction.homeScore),
@@ -105,8 +161,8 @@ export default function PredictPage() {
         });
         return init;
       });
-      if (data.rounds.length > 0 && !activeTab) {
-        setActiveTab(data.rounds[0].id);
+      if (sortedRounds.length > 0 && !activeTab) {
+        setActiveTab(sortedRounds[0].id);
       }
       setLoadingData(false);
     }
@@ -303,8 +359,8 @@ export default function PredictPage() {
                         <div className="flex items-center justify-between sm:justify-center gap-2 sm:gap-4">
                           {/* Home Team */}
                           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center text-xl sm:text-2xl shrink-0 border border-white/5">
-                              {getFlag(match.homeTeam)}
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden shrink-0 border border-white/5">
+                              <FlagImage team={match.homeTeam} size={48} />
                             </div>
                             <div className="min-w-0">
                               <div className="font-bold text-base sm:text-lg truncate">{match.homeTeam}</div>
@@ -329,8 +385,8 @@ export default function PredictPage() {
 
                           {/* Away Team */}
                           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-row-reverse text-right">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center text-xl sm:text-2xl shrink-0 border border-white/5">
-                              {getFlag(match.awayTeam)}
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden shrink-0 border border-white/5">
+                              <FlagImage team={match.awayTeam} size={48} />
                             </div>
                             <div className="min-w-0">
                               <div className="font-bold text-base sm:text-lg truncate">{match.awayTeam}</div>
