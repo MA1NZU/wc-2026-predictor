@@ -37,91 +37,58 @@ type Round = {
   matches: Match[];
 };
 
-/* ------------------------------------------------------------------ */
-/*  Country -> ISO 2-letter code for flagcdn.com                       */
-/* ------------------------------------------------------------------ */
-const COUNTRY_CODES: Record<string, string> = {
-  AFGHANISTAN: "af", ALBANIA: "al", ALGERIA: "dz", ANDORRA: "ad", ANGOLA: "ao",
-  ANTIGUA: "ag", ARGENTINA: "ar", ARMENIA: "am", AUSTRALIA: "au", AUSTRIA: "at",
-  AZERBAIJAN: "az", BAHAMAS: "bs", BAHRAIN: "bh", BANGLADESH: "bd", BARBADOS: "bb",
-  BELARUS: "by", BELGIUM: "be", BELIZE: "bz", BENIN: "bj", BERMUDA: "bm",
-  BHUTAN: "bt", BOLIVIA: "bo", BOSNIA: "ba", BOTSWANA: "bw", BRAZIL: "br",
-  BULGARIA: "bg", BURKINA: "bf", BURUNDI: "bi", CAMBODIA: "kh", CAMEROON: "cm",
-  CANADA: "ca", CAPE: "cv", CHAD: "td", CHILE: "cl", CHINA: "cn",
-  COLOMBIA: "co", COMOROS: "km", CONGO: "cg", COSTA: "cr", CROATIA: "hr",
-  CUBA: "cu", CYPRUS: "cy", CZECH: "cz", CZECHIA: "cz", DENMARK: "dk",
-  DJIBOUTI: "dj", DOMINICA: "dm", DOMINICAN: "do", ECUADOR: "ec", EGYPT: "eg",
-  EL: "sv", ENGLAND: "gb-eng", EQUATORIAL: "gq", ERITREA: "er", ESTONIA: "ee",
-  ESWATINI: "sz", ETHIOPIA: "et", FIJI: "fj", FINLAND: "fi", FRANCE: "fr",
-  GABON: "ga", GAMBIA: "gm", GEORGIA: "ge", GERMANY: "de", GHANA: "gh",
-  GIBRALTAR: "gi", GREECE: "gr", GRENADA: "gd", GUADELOUPE: "gp", GUAM: "gu",
-  GUATEMALA: "gt", GUINEA: "gn", GUYANA: "gy", HAITI: "ht", HONDURAS: "hn",
-  HONG: "hk", HUNGARY: "hu", ICELAND: "is", INDIA: "in", INDONESIA: "id",
-  IRAN: "ir", IRAQ: "iq", IRELAND: "ie", ISRAEL: "il", ITALY: "it",
-  IVORY: "ci", JAMAICA: "jm", JAPAN: "jp", JORDAN: "jo", KAZAKHSTAN: "kz",
-  KENYA: "ke", KIRIBATI: "ki", KOREA: "kr", KOSOVO: "xk", KUWAIT: "kw",
-  KYRGYZSTAN: "kg", LAOS: "la", LATVIA: "lv", LEBANON: "lb", LESOTHO: "ls",
-  LIBERIA: "lr", LIBYA: "ly", LIECHTENSTEIN: "li", LITHUANIA: "lt", LUXEMBOURG: "lu",
-  MACAU: "mo", MACEDONIA: "mk", MADAGASCAR: "mg", MALAWI: "mw", MALAYSIA: "my",
-  MALDIVES: "mv", MALI: "ml", MALTA: "mt", MARTINIQUE: "mq", MAURITANIA: "mr",
-  MAURITIUS: "mu", MEXICO: "mx", MOLDOVA: "md", MONACO: "mc", MONGOLIA: "mn",
-  MONTENEGRO: "me", MOROCCO: "ma", MOZAMBIQUE: "mz", MYANMAR: "mm", NAMIBIA: "na",
-  NEPAL: "np", NETHERLANDS: "nl", NEWCALEDONIA: "nc", "NEW ZEALAND": "nz", NICARAGUA: "ni",
-  NIGER: "ne", NIGERIA: "ng", NORTH: "mk", NORTHERN: "gb", NORWAY: "no",
-  OMAN: "om", PAKISTAN: "pk", PALESTINE: "ps", PANAMA: "pa", PAPUA: "pg",
-  PARAGUAY: "py", PERU: "pe", PHILIPPINES: "ph", POLAND: "pl", PORTUGAL: "pt",
-  PUERTO: "pr", QATAR: "qa", REUNION: "re", RICA: "cr", ROMANIA: "ro",
-  RUSSIA: "ru", RWANDA: "rw", "SAINT LUCIA": "lc", SALVADOR: "sv", SAMOA: "ws",
-  "SAN MARINO": "sm", SAUDI: "sa", SCOTLAND: "gb-sct", SENEGAL: "sn", SERBIA: "rs",
-  SEYCHELLES: "sc", SIERRA: "sl", SINGAPORE: "sg", SLOVAKIA: "sk", SLOVENIA: "si",
-  "SOLOMON ISLANDS": "sb", SOMALIA: "so", "SOUTH AFRICA": "za", "SOUTH KOREA": "kr", "SOUTH SUDAN": "ss",
-  SPAIN: "es", SRI: "lk", STKITTS: "kn", SUDAN: "sd", SURINAME: "sr",
-  SWEDEN: "se", SWITZERLAND: "ch", SYRIA: "sy", TAIWAN: "tw", TAJIKISTAN: "tj",
-  TANZANIA: "tz", TAHITI: "pf", THAILAND: "th", TOGO: "tg", TRINIDAD: "tt",
-  TUNISIA: "tn", TURKEY: "tr", TURKMENISTAN: "tm", UGANDA: "ug", UKRAINE: "ua",
-  UNITED: "gb", URUGUAY: "uy", USA: "us", UZBEKISTAN: "uz", VANUATU: "vu",
-  VENEZUELA: "ve", VIETNAM: "vn", WALES: "gb-wls", YEMEN: "ye", ZAMBIA: "zm",
-  ZIMBABWE: "zw", SVG: "vc", "CÔTE D'IVOIRE": "ci", "COTE D'IVOIRE": "ci",
-  MAYOTTE: "yt", CURACAO: "cw", ARUBA: "aw", BONAIRE: "bq", FRENCH: "gf",
-  "ST VINCENT": "vc", "ST VINCENT AND THE GRENADINES": "vc", "VIRGIN ISLANDS": "vi",
-};
+function getFlag(team: string) {
+  const flags: Record<string, string> = {
+    /* ---------- UEFA (16) ---------- */
+    FRANCE: "🇫🇷", GERMANY: "🇩🇪", ENGLAND: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SPAIN: "🇪🇸", PORTUGAL: "🇵🇹",
+    NETHERLANDS: "🇳🇱", BELGIUM: "🇧🇪", ITALY: "🇮🇹", CROATIA: "🇭🇷", DENMARK: "🇩🇰",
+    SWITZERLAND: "🇨🇭", POLAND: "🇵🇱", WALES: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", SCOTLAND: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", UKRAINE: "🇺🇦",
+    AUSTRIA: "🇦🇹", SERBIA: "🇷🇸", SWEDEN: "🇸🇪", NORWAY: "🇳🇴", CZECHIA: "🇨🇿",
+    CZECH: "🇨🇿", HUNGARY: "🇭🇺", ROMANIA: "🇷🇴", SLOVAKIA: "🇸🇰", SLOVENIA: "🇸🇮",
+    GREECE: "🇬🇷", TURKEY: "🇹🇷", IRELAND: "🇮🇪", NORTHERN: "🇬🇧", BOSNIA: "🇧🇦",
+    FINLAND: "🇫🇮", RUSSIA: "🇷🇺", ISRAEL: "🇮🇱",
 
-function getCountryCode(name: string): string {
-  const upper = name.toUpperCase().trim();
-  if (COUNTRY_CODES[upper]) return COUNTRY_CODES[upper];
-  for (const [key, code] of Object.entries(COUNTRY_CODES)) {
-    if (upper.includes(key)) return code;
-  }
-  return upper.slice(0, 2).toLowerCase();
-}
+    /* ---------- CONMEBOL (6) ---------- */
+    ARGENTINA: "🇦🇷", BRAZIL: "🇧🇷", URUGUAY: "🇺🇾", COLOMBIA: "🇨🇴", ECUADOR: "🇪🇨",
+    CHILE: "🇨🇱", PERU: "🇵🇪", PARAGUAY: "🇵🇾", BOLIVIA: "🇧🇴", VENEZUELA: "🇻🇪",
 
-function FlagImage({ team, size = 40 }: { team: string; size?: number }) {
-  const code = getCountryCode(team);
-  const url = `https://flagcdn.com/w${size}/${code}.png`;
-  const [error, setError] = useState(false);
+    /* ---------- CONCACAF (9 incl. 3 hosts) ---------- */
+    USA: "🇺🇸", CANADA: "🇨🇦", MEXICO: "🇲🇽", PANAMA: "🇵🇦", COSTA: "🇨🇷",
+    RICA: "🇨🇷", HONDURAS: "🇭🇳", JAMAICA: "🇯🇲", EL: "🇸🇻", SALVADOR: "🇸🇻",
+    GUATEMALA: "🇬🇹", HAITI: "🇭🇹", TRINIDAD: "🇹🇹", CUBA: "🇨🇺", CURACAO: "🇨🇼",
+    NICARAGUA: "🇳🇮", BERMUDA: "🇧🇲",
 
-  if (error) {
-    return (
-      <div
-        className="w-full h-full flex items-center justify-center bg-white/10 text-white/60 font-bold text-[10px] sm:text-xs uppercase rounded-lg border border-white/10"
-        title={team}
-      >
-        {code}
-      </div>
-    );
-  }
+    /* ---------- CAF (9) ---------- */
+    MOROCCO: "🇲🇦", EGYPT: "🇪🇬", SENEGAL: "🇸🇳", TUNISIA: "🇹🇳", ALGERIA: "🇩🇿",
+    NIGERIA: "🇳🇬", CAMEROON: "🇨🇲", GHANA: "🇬🇭", IVORY: "🇨🇮", COTE: "🇨🇮",
+    "CÔTE D'IVOIRE": "🇨🇮", MALI: "🇲🇱", BURKINA: "🇧🇫", SOUTH: "🇿🇦", KENYA: "🇰🇪",
+    ZAMBIA: "🇿🇲", DR: "🇨🇩", CONGO: "🇨🇬", ANGOLA: "🇦🇴", TANZANIA: "🇹🇿",
+    UGANDA: "🇺🇬", GABON: "🇬🇦", MOZAMBIQUE: "🇲🇿", MADAGASCAR: "🇲🇬", LIBERIA: "🇱🇷",
+    TOGO: "🇹🇬", SUDAN: "🇸🇩", MAURITANIA: "🇲🇷", LIBYA: "🇱🇾", GUINEA: "🇬🇳",
+    NAMIBIA: "🇳🇦", BENIN: "🇧🇯", RWANDA: "🇷🇼", MALAWI: "🇲🇼", ZIMBABWE: "🇿🇼",
+    SIERRA: "🇸🇱", BOTSWANA: "🇧🇼", ESWATINI: "🇸🇿", LESOTHO: "🇱🇸", COMOROS: "🇰🇲",
+    CHAD: "🇹🇩", ERITREA: "🇪🇷", DJIBOUTI: "🇩🇯", CENTRAL: "🇨🇫", EQUATORIAL: "🇬🇶",
+    SAO: "🇸🇹", CAPE: "🇨🇻", SEYCHELLES: "🇸🇨", MAURITIUS: "🇲🇺", BURUNDI: "🇧🇮",
+    SOMALIA: "🇸🇴", SOUTH: "🇸🇸",
 
-  return (
-    <img
-      src={url}
-      alt={team}
-      width={size}
-      height={size}
-      className="w-full h-full object-cover rounded-lg"
-      onError={() => setError(true)}
-      loading="lazy"
-    />
-  );
+    /* ---------- AFC (8) ---------- */
+    JAPAN: "🇯🇵", KOREA: "🇰🇷", AUSTRALIA: "🇦🇺", IRAN: "🇮🇷", SAUDI: "🇸🇦",
+    ARABIA: "🇸🇦", QATAR: "🇶🇦", IRAQ: "🇮🇶", UZBEKISTAN: "🇺🇿", JORDAN: "🇯🇴",
+    UAE: "🇦🇪", BAHRAIN: "🇧🇭", CHINA: "🇨🇳", THAILAND: "🇹🇭", INDONESIA: "🇮🇩",
+    SYRIA: "🇸🇾", OMAN: "🇴🇲", INDIA: "🇮🇳", LEBANON: "🇱🇧", VIETNAM: "🇻🇳",
+    TAJIKISTAN: "🇹🇯", KUWAIT: "🇰🇼", PALESTINE: "🇵🇸", MALAYSIA: "🇲🇾", SINGAPORE: "🇸🇬",
+    KYRGYZSTAN: "🇰🇬", MONGOLIA: "🇲🇳", TURKMENISTAN: "🇹🇲", HONG: "🇭🇰", TAIWAN: "🇹🇼",
+    MACAU: "🇲🇴", YEMEN: "🇾🇪", AFGHANISTAN: "🇦🇫", BANGLADESH: "🇧🇩", NEPAL: "🇳🇵",
+    PAKISTAN: "🇵🇰", SRI: "🇱🇰", BHUTAN: "🇧🇹", MALDIVES: "🇲🇻", GUAM: "🇬🇺",
+    CAMBODIA: "🇰🇭", LAOS: "🇱🇦", MYANMAR: "🇲🇲", BRUNEI: "🇧🇳", PHILIPPINES: "🇵🇭",
+    NORTH: "🇰🇵", MALAYSIA: "🇲🇾",
+
+    /* ---------- OFC (1) ---------- */
+    "NEW ZEALAND": "🇳🇿", FIJI: "🇫🇯", PAPUA: "🇵🇬", NEWCALEDONIA: "🇳🇨", TAHITI: "🇵🇫",
+    SAMOA: "🇼🇸", VANUATU: "🇻🇺", SOLOMON: "🇸🇧",
+  };
+  const upper = team.toUpperCase().trim();
+  return flags[upper] || flags[upper.slice(0, 3)] || "🏳️";
 }
 
 function formatDate(dateStr: string) {
@@ -378,8 +345,8 @@ export default function PredictPage() {
                         <div className="flex items-center justify-between sm:justify-center gap-2 sm:gap-4">
                           {/* Home Team */}
                           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden shrink-0 border border-white/5">
-                              <FlagImage team={match.homeTeam} size={48} />
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center text-xl sm:text-2xl shrink-0 border border-white/5">
+                              {getFlag(match.homeTeam)}
                             </div>
                             <div className="min-w-0">
                               <div className="font-bold text-base sm:text-lg truncate">{match.homeTeam}</div>
@@ -404,8 +371,8 @@ export default function PredictPage() {
 
                           {/* Away Team */}
                           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 flex-row-reverse text-right">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden shrink-0 border border-white/5">
-                              <FlagImage team={match.awayTeam} size={48} />
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center text-xl sm:text-2xl shrink-0 border border-white/5">
+                              {getFlag(match.awayTeam)}
                             </div>
                             <div className="min-w-0">
                               <div className="font-bold text-base sm:text-lg truncate">{match.awayTeam}</div>
