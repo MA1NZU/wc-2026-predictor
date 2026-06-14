@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import {
   Swords,
@@ -41,51 +41,57 @@ type Round = {
 /*  Country -> ISO 2-letter code for flagcdn.com                       */
 /* ------------------------------------------------------------------ */
 const COUNTRY_CODES: Record<string, string> = {
-  USA: "us", MEXICO: "mx", CANADA: "ca", ARGENTINA: "ar", BRAZIL: "br", URUGUAY: "uy",
-  COLOMBIA: "co", ECUADOR: "ec", CHILE: "cl", PARAGUAY: "py", PERU: "pe", BOLIVIA: "bo",
-  VENEZUELA: "ve", ENGLAND: "gb-eng", FRANCE: "fr", GERMANY: "de", ITALY: "it",
-  SPAIN: "es", PORTUGAL: "pt", NETHERLANDS: "nl", BELGIUM: "be", CROATIA: "hr", SERBIA: "rs",
-  SWITZERLAND: "ch", DENMARK: "dk", SWEDEN: "se", NORWAY: "no", POLAND: "pl", UKRAINE: "ua",
-  TURKEY: "tr", WALES: "gb-wls", SCOTLAND: "gb-sct", IRELAND: "ie", AUSTRIA: "at",
-  CZECHIA: "cz", CZECH: "cz", HUNGARY: "hu", ROMANIA: "ro", BULGARIA: "bg", GREECE: "gr",
-  RUSSIA: "ru", MOROCCO: "ma", EGYPT: "eg", TUNISIA: "tn", ALGERIA: "dz", SENEGAL: "sn",
-  NIGERIA: "ng", CAMEROON: "cm", GHANA: "gh", IVORY: "ci", "CÔTE D'IVOIRE": "ci",
-  "SOUTH AFRICA": "za", JAPAN: "jp", KOREA: "kr", "SOUTH KOREA": "kr", CHINA: "cn",
-  AUSTRALIA: "au", IRAN: "ir", SAUDI: "sa", ARABIA: "sa", QATAR: "qa", EMIRATES: "ae",
-  IRAQ: "iq", UZBEKISTAN: "uz", INDIA: "in", "NEW ZEALAND": "nz", COSTA: "cr", RICA: "cr",
-  PANAMA: "pa", HONDURAS: "hn", JAMAICA: "jm", HAITI: "ht", SALVADOR: "sv", TRINIDAD: "tt",
-  GUATEMALA: "gt", MALI: "ml", BURKINA: "bf", GUINEA: "gn", ZAMBIA: "zm", KENYA: "ke",
-  "DEMOCRATIC REPUBLIC OF CONGO": "cd", CONGO: "cg", TOGO: "tg", SUDAN: "sd", LIBERIA: "lr",
-  MAURITANIA: "mr", GABON: "ga", ANGOLA: "ao", MOZAMBIQUE: "mz", MADAGASCAR: "mg",
-  PAPUA: "pg", FIJI: "fj", TAHITI: "pf", NEWCALEDONIA: "nc", OMAN: "om", JORDAN: "jo",
-  SYRIA: "sy", LEBANON: "lb", BAHRAIN: "bh", KUWAIT: "kw", YEMEN: "ye", PALESTINE: "ps",
-  AZERBAIJAN: "az", ARMENIA: "am", GEORGIA: "ge", KAZAKHSTAN: "kz", TAJIKISTAN: "tj",
-  KYRGYZSTAN: "kg", TURKMENISTAN: "tm", MONGOLIA: "mn", THAILAND: "th", VIETNAM: "vn",
-  MALAYSIA: "my", SINGAPORE: "sg", INDONESIA: "id", PHILIPPINES: "ph", MYANMAR: "mm",
-  CAMBODIA: "kh", LAOS: "la", BRUNEI: "bn", MACAU: "mo", HONG: "hk", TAIWAN: "tw",
-  PAKISTAN: "pk", BANGLADESH: "bd", SRI: "lk", NEPAL: "np", BHUTAN: "bt", MALDIVES: "mv",
-  AFGHANISTAN: "af", ESTONIA: "ee", LATVIA: "lv", LITHUANIA: "lt", FINLAND: "fi",
-  ICELAND: "is", ALBANIA: "al", BOSNIA: "ba", MONTENEGRO: "me", NORTH: "mk", MACEDONIA: "mk",
-  SLOVAKIA: "sk", SLOVENIA: "si", MOLDOVA: "md", LUXEMBOURG: "lu", ANDORRA: "ad",
-  MALTA: "mt", CYPRUS: "cy", SAN: "sm", MONACO: "mc", LIECHTENSTEIN: "li", FAROE: "fo",
-  GIBRALTAR: "gi", KOSOVO: "xk", MARTINIQUE: "mq", GUADELOUPE: "gp", FRENCH: "gf",
-  REUNION: "re", MAYOTTE: "yt", CURACAO: "cw", ARUBA: "aw", BONAIRE: "bq",
-  SURINAME: "sr", GUYANA: "gy", CUBA: "cu", DOMINICAN: "do", PUERTO: "pr",
-  BERMUDA: "bm", HAITI: "ht", JAMAICA: "jm", HONDURAS: "hn", PANAMA: "pa",
-  COSTA: "cr", RICA: "cr", SALVADOR: "sv", TRINIDAD: "tt", GUATEMALA: "gt",
-  NICARAGUA: "ni", BELIZE: "bz", BARBADOS: "bb", DOMINICA: "dm", GRENADA: "gd",
-  STLUCIA: "lc", SVG: "vc", ANTIGUA: "ag", STKITTS: "kn", BAHAMAS: "bs",
+  AFGHANISTAN: "af", ALBANIA: "al", ALGERIA: "dz", ANDORRA: "ad", ANGOLA: "ao",
+  ANTIGUA: "ag", ARGENTINA: "ar", ARMENIA: "am", AUSTRALIA: "au", AUSTRIA: "at",
+  AZERBAIJAN: "az", BAHAMAS: "bs", BAHRAIN: "bh", BANGLADESH: "bd", BARBADOS: "bb",
+  BELARUS: "by", BELGIUM: "be", BELIZE: "bz", BENIN: "bj", BERMUDA: "bm",
+  BHUTAN: "bt", BOLIVIA: "bo", BOSNIA: "ba", BOTSWANA: "bw", BRAZIL: "br",
+  BULGARIA: "bg", BURKINA: "bf", BURUNDI: "bi", CAMBODIA: "kh", CAMEROON: "cm",
+  CANADA: "ca", CAPE: "cv", CHAD: "td", CHILE: "cl", CHINA: "cn",
+  COLOMBIA: "co", COMOROS: "km", CONGO: "cg", COSTA: "cr", CROATIA: "hr",
+  CUBA: "cu", CYPRUS: "cy", CZECH: "cz", CZECHIA: "cz", DENMARK: "dk",
+  DJIBOUTI: "dj", DOMINICA: "dm", DOMINICAN: "do", ECUADOR: "ec", EGYPT: "eg",
+  EL: "sv", ENGLAND: "gb-eng", EQUATORIAL: "gq", ERITREA: "er", ESTONIA: "ee",
+  ESWATINI: "sz", ETHIOPIA: "et", FIJI: "fj", FINLAND: "fi", FRANCE: "fr",
+  GABON: "ga", GAMBIA: "gm", GEORGIA: "ge", GERMANY: "de", GHANA: "gh",
+  GIBRALTAR: "gi", GREECE: "gr", GRENADA: "gd", GUADELOUPE: "gp", GUAM: "gu",
+  GUATEMALA: "gt", GUINEA: "gn", GUYANA: "gy", HAITI: "ht", HONDURAS: "hn",
+  HONG: "hk", HUNGARY: "hu", ICELAND: "is", INDIA: "in", INDONESIA: "id",
+  IRAN: "ir", IRAQ: "iq", IRELAND: "ie", ISRAEL: "il", ITALY: "it",
+  IVORY: "ci", JAMAICA: "jm", JAPAN: "jp", JORDAN: "jo", KAZAKHSTAN: "kz",
+  KENYA: "ke", KIRIBATI: "ki", KOREA: "kr", KOSOVO: "xk", KUWAIT: "kw",
+  KYRGYZSTAN: "kg", LAOS: "la", LATVIA: "lv", LEBANON: "lb", LESOTHO: "ls",
+  LIBERIA: "lr", LIBYA: "ly", LIECHTENSTEIN: "li", LITHUANIA: "lt", LUXEMBOURG: "lu",
+  MACAU: "mo", MACEDONIA: "mk", MADAGASCAR: "mg", MALAWI: "mw", MALAYSIA: "my",
+  MALDIVES: "mv", MALI: "ml", MALTA: "mt", MARTINIQUE: "mq", MAURITANIA: "mr",
+  MAURITIUS: "mu", MEXICO: "mx", MOLDOVA: "md", MONACO: "mc", MONGOLIA: "mn",
+  MONTENEGRO: "me", MOROCCO: "ma", MOZAMBIQUE: "mz", MYANMAR: "mm", NAMIBIA: "na",
+  NEPAL: "np", NETHERLANDS: "nl", NEWCALEDONIA: "nc", "NEW ZEALAND": "nz", NICARAGUA: "ni",
+  NIGER: "ne", NIGERIA: "ng", NORTH: "mk", NORTHERN: "gb", NORWAY: "no",
+  OMAN: "om", PAKISTAN: "pk", PALESTINE: "ps", PANAMA: "pa", PAPUA: "pg",
+  PARAGUAY: "py", PERU: "pe", PHILIPPINES: "ph", POLAND: "pl", PORTUGAL: "pt",
+  PUERTO: "pr", QATAR: "qa", REUNION: "re", RICA: "cr", ROMANIA: "ro",
+  RUSSIA: "ru", RWANDA: "rw", "SAINT LUCIA": "lc", SALVADOR: "sv", SAMOA: "ws",
+  "SAN MARINO": "sm", SAUDI: "sa", SCOTLAND: "gb-sct", SENEGAL: "sn", SERBIA: "rs",
+  SEYCHELLES: "sc", SIERRA: "sl", SINGAPORE: "sg", SLOVAKIA: "sk", SLOVENIA: "si",
+  "SOLOMON ISLANDS": "sb", SOMALIA: "so", "SOUTH AFRICA": "za", "SOUTH KOREA": "kr", "SOUTH SUDAN": "ss",
+  SPAIN: "es", SRI: "lk", STKITTS: "kn", SUDAN: "sd", SURINAME: "sr",
+  SWEDEN: "se", SWITZERLAND: "ch", SYRIA: "sy", TAIWAN: "tw", TAJIKISTAN: "tj",
+  TANZANIA: "tz", TAHITI: "pf", THAILAND: "th", TOGO: "tg", TRINIDAD: "tt",
+  TUNISIA: "tn", TURKEY: "tr", TURKMENISTAN: "tm", UGANDA: "ug", UKRAINE: "ua",
+  UNITED: "gb", URUGUAY: "uy", USA: "us", UZBEKISTAN: "uz", VANUATU: "vu",
+  VENEZUELA: "ve", VIETNAM: "vn", WALES: "gb-wls", YEMEN: "ye", ZAMBIA: "zm",
+  ZIMBABWE: "zw", SVG: "vc", "CÔTE D'IVOIRE": "ci", "COTE D'IVOIRE": "ci",
+  MAYOTTE: "yt", CURACAO: "cw", ARUBA: "aw", BONAIRE: "bq", FRENCH: "gf",
+  "ST VINCENT": "vc", "ST VINCENT AND THE GRENADINES": "vc", "VIRGIN ISLANDS": "vi",
 };
 
 function getCountryCode(name: string): string {
   const upper = name.toUpperCase().trim();
-  // Direct match first
   if (COUNTRY_CODES[upper]) return COUNTRY_CODES[upper];
-  // Partial match fallback
   for (const [key, code] of Object.entries(COUNTRY_CODES)) {
     if (upper.includes(key)) return code;
   }
-  // Default to first 2 letters as ISO guess
   return upper.slice(0, 2).toLowerCase();
 }
 
@@ -100,7 +106,6 @@ function FlagImage({ team, size = 40 }: { team: string; size?: number }) {
       height={size}
       className="rounded-lg object-cover border border-white/10 bg-white/5"
       onError={(e) => {
-        // fallback to a generic shield icon if flag fails
         (e.target as HTMLImageElement).style.display = "none";
       }}
     />
@@ -140,7 +145,6 @@ export default function PredictPage() {
     const res = await fetch("/api/rounds", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      // Sort each round's matches by matchDate ascending
       const sortedRounds = (data.rounds || []).map((r: Round) => ({
         ...r,
         matches: [...r.matches].sort(
