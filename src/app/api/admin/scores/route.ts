@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { getUser } from "@/lib/auth";
 import { clearCache } from "@/lib/cache";
 
@@ -13,18 +13,24 @@ export async function PATCH(req: NextRequest) {
     const { id, homeScore, awayScore } = await req.json();
 
     const updateData: any = {};
-    if (homeScore !== undefined) updateData.homeScore = homeScore === null ? null : Number(homeScore);
-    if (awayScore !== undefined) updateData.awayScore = awayScore === null ? null : Number(awayScore);
-    updateData.updatedAt = new Date();
+    if (homeScore !== undefined) updateData.home_score = homeScore === null ? null : Number(homeScore);
+    if (awayScore !== undefined) updateData.away_score = awayScore === null ? null : Number(awayScore);
 
-    await db.collection("matches").doc(id).update(updateData);
+    const { data: match, error } = await supabase
+      .from("matches")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error || !match) {
+      return NextResponse.json({ error: "Failed to update score" }, { status: 500 });
+    }
 
     clearCache();
-
-    const doc = await db.collection("matches").doc(id).get();
-    return NextResponse.json({ match: { id: doc.id, ...doc.data() } });
-  } catch (err: any) {
-    console.error("Update score error:", err?.message || err);
+    return NextResponse.json({ match });
+  } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: "Failed to update score" }, { status: 500 });
   }
 }
