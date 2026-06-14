@@ -4,14 +4,15 @@ import { getUser } from "@/lib/auth";
 
 export async function GET() {
   const user = await getUser();
-  if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user?.isAdmin)
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const roundsSnap = await db.collection("rounds").orderBy("order", "asc").get();
   const matchesSnap = await db.collection("matches").orderBy("order", "asc").get();
 
   const matchesMap = new Map<string, any[]>();
   matchesSnap.docs.forEach((doc) => {
-    const d = { id: doc.id, ...doc.data() };
+    const d = { id: doc.id, ...doc.data() } as any;
     if (!matchesMap.has(d.roundId)) matchesMap.set(d.roundId, []);
     matchesMap.get(d.roundId)!.push(d);
   });
@@ -27,7 +28,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const user = await getUser();
-  if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user?.isAdmin)
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { name, status, order } = await req.json();
 
@@ -45,7 +47,8 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const user = await getUser();
-  if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user?.isAdmin)
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id, status, name, order } = await req.json();
 
