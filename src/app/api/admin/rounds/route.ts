@@ -4,8 +4,7 @@ import { getUser } from "@/lib/auth";
 
 export async function GET() {
   const user = await getUser();
-  if (!user?.isAdmin)
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const roundsSnap = await db.collection("rounds").orderBy("order", "asc").get();
   const matchesSnap = await db.collection("matches").orderBy("order", "asc").get();
@@ -28,8 +27,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const user = await getUser();
-  if (!user?.isAdmin)
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { name, status, order } = await req.json();
 
@@ -47,8 +45,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const user = await getUser();
-  if (!user?.isAdmin)
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id, status, name, order } = await req.json();
 
