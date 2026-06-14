@@ -47,7 +47,7 @@ function getFlag(team: string) {
     AUSTRIA: "🇦🇹", SERBIA: "🇷🇸", SWEDEN: "🇸🇪", NORWAY: "🇳🇴", CZECHIA: "🇨🇿",
     CZECH: "🇨🇿", HUNGARY: "🇭🇺", ROMANIA: "🇷🇴", SLOVAKIA: "🇸🇰", SLOVENIA: "🇸🇮",
     GREECE: "🇬🇷", TURKEY: "🇹🇷", IRELAND: "🇮🇪", NORTHERN: "🇬🇧", BOSNIA: "🇧🇦",
-    FINLAND: "🇫🇮", RUSSIA: "🇷🇺", "SOUTH AFRICA": "🇿🇦", "TURKIYE": "🇹🇷", "SOUTH KOREA": "🇰🇷", "IVORY COAST": "🇨🇮", "CAPE VERDE": "🇨🇻", "SAUDI ARABIA": "🇸🇦", "DR CONGO": "🇨🇬",
+    FINLAND: "🇫🇮", RUSSIA: "🇷🇺", ISRAEL: "🇮🇱",
 
     /* ---------- CONMEBOL (6) ---------- */
     ARGENTINA: "🇦🇷", BRAZIL: "🇧🇷", URUGUAY: "🇺🇾", COLOMBIA: "🇨🇴", ECUADOR: "🇪🇨",
@@ -313,8 +313,8 @@ export default function PredictPage() {
               // 🔥 KEY CHANGE: match-level isLive OR round-level LIVE/FINISHED
               const isLocked = match.isLive || activeRound.status === "LIVE" || activeRound.status === "FINISHED";
               const hasPrediction = match.prediction !== null;
-              const pointsMeta = getPointsLabel(match.points, isDoubled);
               const isDoubled = match.doublePick;
+              const pointsMeta = getPointsLabel(match.points, isDoubled);
 
               return (
                 <div
