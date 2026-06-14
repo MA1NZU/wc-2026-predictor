@@ -1,56 +1,108 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getUser } from "@/lib/auth";
+import { getCache, setCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+function calculatePoints(
+  pred: { home_score: number; away_score: number },
+  match: { home_score: number | null; away_score: number | null }
+) {
+  if (match.home_score === null || match.away_score === null) return null;
+  if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
+
+  const predOutcome = pred.home_score > pred.away_score ? "home" : pred.home_score < pred.away_score ? "away" : "draw";
+  const actOutcome = match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
+
+  if (predOutcome === actOutcome) return 3;
+  return 0;
+}
+
+export async function GET() {
   try {
     const user = await getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { matchId, homeScore, awayScore } = await req.json();
+    const cacheKey = `rounds-data-${Math.floor(Date.now() / 60_000)}`;
+    let cachedData = getCache<any>(cacheKey, 60_000);
 
-    if (homeScore === undefined || awayScore === undefined || !matchId) {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    let roundsData, matchesData;
+    if (cachedData) {
+      roundsData = cachedData.rounds;
+      matchesData = cachedData.matches;
+    } else {
+      const { data: rounds } = await supabase
+        .from("rounds")
+        .select("*")
+        .order("order_num", { ascending: true });
+
+      const { data: matches } = await supabase
+        .from("matches")
+        .select("*")
+        .order("order_num", { ascending: true });
+
+      roundsData = rounds || [];
+      matchesData = matches || [];
+
+      setCache(cacheKey, { rounds: roundsData, matches: matchesData }, 60_000);
     }
 
-    const { data: match } = await supabase
-      .from("matches")
-      .select("*, rounds!inner(status)")
-      .eq("id", matchId)
-      .single();
+    const matchesMap = new Map<string, any>();
+    matchesData.forEach((m: any) => matchesMap.set(m.id, m));
 
-    if (!match) {
-      return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    let predictionsMap = new Map<string, any>();
+    let doublePicksSet = new Set<string>();
+
+    if (user) {
+      const { data: predictions } = await supabase
+        .from("predictions")
+        .select("*")
+        .eq("user_id", user.userId);
+
+      const { data: doublePicks } = await supabase
+        .from("double_picks")
+        .select("*")
+        .eq("user_id", user.userId);
+
+      (predictions || []).forEach((p: any) => predictionsMap.set(p.match_id, p));
+      (doublePicks || []).forEach((d: any) => doublePicksSet.add(d.match_id));
     }
 
-    if (match.is_live || match.rounds.status === "LIVE" || match.rounds.status === "FINISHED") {
-      return NextResponse.json({ error: "Predictions are locked for this match" }, { status: 403 });
-    }
+    const rounds = roundsData.map((round: any) => {
+      const roundMatches = matchesData.filter((m: any) => m.round_id === round.id);
 
-    const { data: prediction, error } = await supabase
-      .from("predictions")
-      .upsert(
-        {
-          user_id: user.userId,
-          match_id: matchId,
-          home_score: Number(homeScore),
-          away_score: Number(awayScore),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,match_id" }
-      )
-      .select()
-      .single();
+      return {
+        id: round.id,
+        name: round.name,
+        status: round.status,
+        order: round.order_num || 0,
+        matches: roundMatches.map((match: any) => {
+          const pred = predictionsMap.get(match.id) || null;
+          const double = doublePicksSet.has(match.id);
+          const basePoints = pred ? calculatePoints(pred, match) : null;
+          const points = basePoints !== null ? (double ? basePoints * 2 : basePoints) : null;
 
-    if (error) {
-      return NextResponse.json({ error: "Failed to save prediction" }, { status: 500 });
-    }
+          return {
+            id: match.id,
+            homeTeam: match.home_team,
+            awayTeam: match.away_team,
+            matchDate: match.match_date,
+            homeScore: match.home_score ?? null,
+            awayScore: match.away_score ?? null,
+            isLive: match.is_live ?? false,
+            prediction: pred
+              ? { homeScore: pred.home_score, awayScore: pred.away_score }
+              : null,
+            doublePick: double,
+            points,
+          };
+        }),
+      };
+    });
 
-    return NextResponse.json({ prediction });
+    return NextResponse.json({ rounds });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ rounds: [] });
   }
 }
