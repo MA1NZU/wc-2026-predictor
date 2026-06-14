@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
+import { getCache, setCache } from "@/lib/cache";
 
 function calculatePoints(
   pred: { homeScore: number; awayScore: number },
@@ -16,6 +17,10 @@ function calculatePoints(
 }
 
 export async function GET() {
+  // Cache leaderboard for 60 seconds (shared across all users)
+  const cached = getCache<any>("leaderboard", 60_000);
+  if (cached) return NextResponse.json({ leaderboard: cached });
+
   const [usersSnap, predsSnap, dpSnap, matchesSnap] = await Promise.all([
     db.collection("users").get(),
     db.collection("predictions").get(),
@@ -25,13 +30,14 @@ export async function GET() {
 
   const matchesMap = new Map<string, any>();
   matchesSnap.docs.forEach((doc) => {
-    matchesMap.set(doc.id, { id: doc.id, ...doc.data() });
+    matchesMap.set(doc.id, { id: doc.id, ...doc.data() } as any);
   });
 
-  const doubleMap = new Set<string>();
+  const doubleMap = new Map<string, Set<string>>(); // userId -> Set<matchId>
   dpSnap.docs.forEach((doc) => {
     const d = doc.data();
-    doubleMap.add(`${d.userId}_${d.matchId}`);
+    if (!doubleMap.has(d.userId)) doubleMap.set(d.userId, new Set());
+    doubleMap.get(d.userId)!.add(d.matchId);
   });
 
   const userPreds = new Map<string, any[]>();
@@ -45,12 +51,13 @@ export async function GET() {
     const data = doc.data();
     let totalPoints = 0;
     const preds = userPreds.get(doc.id) || [];
+    const userDoubles = doubleMap.get(doc.id) || new Set<string>();
 
     for (const pred of preds) {
       const match = matchesMap.get(pred.matchId);
       if (!match) continue;
       const base = calculatePoints(pred, match);
-      const isDoubled = doubleMap.has(`${doc.id}_${pred.matchId}`);
+      const isDoubled = userDoubles.has(pred.matchId);
       totalPoints += base * (isDoubled ? 2 : 1);
     }
 
@@ -64,5 +71,6 @@ export async function GET() {
 
   leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
 
+  setCache("leaderboard", leaderboard, 60_000);
   return NextResponse.json({ leaderboard });
 }
