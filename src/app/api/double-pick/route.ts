@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { getUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -11,38 +11,37 @@ export async function POST(req: NextRequest) {
 
     const { matchId, roundId } = await req.json();
 
-    const matchDoc = await db.collection("matches").doc(matchId).get();
-    if (!matchDoc.exists) return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    const { data: match } = await supabase
+      .from("matches")
+      .select("*, rounds!inner(status)")
+      .eq("id", matchId)
+      .single();
 
-    const matchData = matchDoc.data()!;
-    const roundDoc = await db.collection("rounds").doc(matchData.roundId).get();
-    const roundData = roundDoc.data()!;
+    if (!match) {
+      return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    }
 
-    if (matchData.isLive || roundData.status === "LIVE" || roundData.status === "FINISHED") {
+    if (match.is_live || match.rounds.status === "LIVE" || match.rounds.status === "FINISHED") {
       return NextResponse.json({ error: "Round is locked" }, { status: 403 });
     }
 
-    const existing = await db
-      .collection("doublePicks")
-      .where("userId", "==", user.userId)
-      .where("roundId", "==", roundId)
-      .get();
+    await supabase
+      .from("double_picks")
+      .delete()
+      .eq("user_id", user.userId)
+      .eq("round_id", roundId);
 
-    const batch = db.batch();
-    existing.docs.forEach((doc) => batch.delete(doc.ref));
+    const { data: doublePick, error } = await supabase
+      .from("double_picks")
+      .insert({ user_id: user.userId, round_id: roundId, match_id: matchId })
+      .select()
+      .single();
 
-    const newRef = db.collection("doublePicks").doc();
-    batch.set(newRef, {
-      userId: user.userId,
-      roundId,
-      matchId,
-      createdAt: new Date(),
-    });
+    if (error) {
+      return NextResponse.json({ error: "Failed to set double pick" }, { status: 500 });
+    }
 
-    await batch.commit();
-
-    const doc = await newRef.get();
-    return NextResponse.json({ doublePick: { id: doc.id, ...doc.data() } });
+    return NextResponse.json({ doublePick });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
