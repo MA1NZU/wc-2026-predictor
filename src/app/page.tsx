@@ -11,7 +11,7 @@ export default function Home() {
           <Trophy className="w-10 h-10 text-wc-gold" />
         </div>
         <h1 className="text-4xl md:text-6xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white via-wc-gold to-white">
-          World Cup 2026
+          RUNIT WC 2026
         </h1>
         <p className="text-xl text-white/70 max-w-2xl mx-auto">
           Predict every match. Climb the leaderboard. Win bragging rights.
