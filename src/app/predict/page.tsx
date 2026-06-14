@@ -47,8 +47,8 @@ function getFlag(team: string) {
     AUSTRIA: "🇦🇹", SERBIA: "🇷🇸", SWEDEN: "🇸🇪", NORWAY: "🇳🇴", CZECHIA: "🇨🇿",
     CZECH: "🇨🇿", HUNGARY: "🇭🇺", ROMANIA: "🇷🇴", SLOVAKIA: "🇸🇰", SLOVENIA: "🇸🇮",
     GREECE: "🇬🇷", TURKEY: "🇹🇷", IRELAND: "🇮🇪", NORTHERN: "🇬🇧", BOSNIA: "🇧🇦",
-    FINLAND: "🇫🇮", RUSSIA: "🇷🇺", "SOUTH AFRICA": "🇿🇦", "TURKIYE": "🇹🇷", "SOUTH KOREA": "🇰🇷", "IVORY COAST": "🇨🇮", "CAPE VERDE": "🇨🇻", "SAUDI ARABIA": "🇸🇦", "DR CONGO": "🇨🇬",
-    
+    FINLAND: "🇫🇮", RUSSIA: "🇷🇺", ISRAEL: "🇮🇱",
+
     /* ---------- CONMEBOL (6) ---------- */
     ARGENTINA: "🇦🇷", BRAZIL: "🇧🇷", URUGUAY: "🇺🇾", COLOMBIA: "🇨🇴", ECUADOR: "🇪🇨",
     CHILE: "🇨🇱", PERU: "🇵🇪", PARAGUAY: "🇵🇾", BOLIVIA: "🇧🇴", VENEZUELA: "🇻🇪",
@@ -157,6 +157,8 @@ export default function PredictPage() {
 
   useEffect(() => {
     fetchRounds();
+    const interval = setInterval(fetchRounds, 60000);
+    return () => clearInterval(interval);
   }, [fetchRounds]);
 
   const savePrediction = async (matchId: string) => {
@@ -226,26 +228,16 @@ export default function PredictPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
       {/* Header */}
-      <div className="mb-6 sm:mb-10 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-wc-gold/20 flex items-center justify-center">
-              <Swords className="w-5 h-5 text-wc-gold" />
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Your Predictions</h1>
+      <div className="mb-6 sm:mb-10">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-wc-gold/20 flex items-center justify-center">
+            <Swords className="w-5 h-5 text-wc-gold" />
           </div>
-          <p className="text-white/50 text-sm sm:text-base ml-0 sm:ml-[52px]">
-            Predict exact scores, pick your double, and watch points roll in live.
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Your Predictions</h1>
         </div>
-        <button
-          onClick={fetchRounds}
-          disabled={loadingData}
-          className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition text-sm font-medium flex items-center gap-1.5"
-        >
-          <Loader2 className={`w-4 h-4 ${loadingData ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+        <p className="text-white/50 text-sm sm:text-base ml-0 sm:ml-[52px]">
+          Predict exact scores, pick your double, and watch points roll in live.
+        </p>
       </div>
 
       {/* Round Tabs */}
