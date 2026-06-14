@@ -106,18 +106,18 @@ export default function LeaderboardPage() {
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  const fetchLeaderboard = async () => {
+    setLoading(true);
+    const res = await fetch("/api/leaderboard", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      setUsers(data.leaderboard);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      const res = await fetch("/api/leaderboard", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.leaderboard);
-      }
-      setLoading(false);
-    };
     fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 60000);
-    return () => clearInterval(interval);
   }, []);
 
   const openUserDetail = async (userId: string) => {
@@ -141,11 +141,21 @@ export default function LeaderboardPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-xl bg-wc-gold/20 flex items-center justify-center">
-          <Trophy className="w-5 h-5 text-wc-gold" />
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-wc-gold/20 flex items-center justify-center">
+            <Trophy className="w-5 h-5 text-wc-gold" />
+          </div>
+          <h1 className="text-3xl font-bold">Leaderboard</h1>
         </div>
-        <h1 className="text-3xl font-bold">Leaderboard</h1>
+        <button
+          onClick={fetchLeaderboard}
+          disabled={loading}
+          className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition text-sm font-medium flex items-center gap-1.5"
+        >
+          <Loader2 className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
       </div>
 
       <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
