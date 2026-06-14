@@ -28,6 +28,7 @@ type Match = {
   prediction: { homeScore: number; awayScore: number } | null;
   doublePick: boolean;
   points: number | null;
+  isLive?: boolean;
 };
 
 type Round = {
@@ -94,11 +95,8 @@ function getFlag(team: string) {
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+    weekday: "short", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
   });
 }
 
@@ -127,8 +125,7 @@ export default function PredictPage() {
       const sortedRounds = (data.rounds || []).map((r: Round) => ({
         ...r,
         matches: [...r.matches].sort(
-          (a: Match, b: Match) =>
-            new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
+          (a: Match, b: Match) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
         ),
       }));
       setRounds(sortedRounds);
@@ -215,10 +212,7 @@ export default function PredictPage() {
         <p className="text-white/50 mb-6 px-4">
           Sign in to make your World Cup 2026 predictions and compete on the leaderboard.
         </p>
-        <a
-          href="/login"
-          className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-wc-gold text-wc-dark font-bold hover:bg-wc-gold/90 transition"
-        >
+        <a href="/login" className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-wc-gold text-wc-dark font-bold hover:bg-wc-gold/90 transition">
           Sign In to Predict <ArrowRight className="w-4 h-4" />
         </a>
       </div>
@@ -312,7 +306,8 @@ export default function PredictPage() {
           <div className="grid gap-3 sm:gap-4">
             {activeRound.matches.map((match) => {
               const inp = inputs[match.id] || { home: "", away: "" };
-              const isLocked = activeRound.status === "LIVE" || activeRound.status === "FINISHED";
+              // 🔥 KEY CHANGE: match-level isLive OR round-level LIVE/FINISHED
+              const isLocked = match.isLive || activeRound.status === "LIVE" || activeRound.status === "FINISHED";
               const hasPrediction = match.prediction !== null;
               const pointsMeta = getPointsLabel(match.points);
               const isDoubled = match.doublePick;
@@ -326,17 +321,32 @@ export default function PredictPage() {
                         ? "bg-white/[0.03] border-wc-gold/10 hover:border-wc-gold/20"
                         : "bg-white/[0.02] border-white/5 hover:border-white/10"
                       : "bg-white/[0.03] border-white/5 hover:border-white/15"
-                  } ${isDoubled ? "ring-1 ring-wc-gold/20" : ""}`}
+                  } ${isDoubled ? "ring-1 ring-wc-gold/20" : ""} ${match.isLive ? "ring-1 ring-wc-red/20" : ""}`}
                 >
                   {/* Double Pick Banner */}
                   {isDoubled && !isLocked && (
                     <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-wc-gold to-transparent" />
                   )}
+                  {/* Live Match Banner */}
+                  {match.isLive && activeRound.status === "OPEN" && (
+                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-wc-red to-transparent" />
+                  )}
 
                   <div className="p-4 sm:p-5 lg:p-6">
                     {/* Date */}
-                    <div className="text-xs text-white/30 mb-3 uppercase tracking-wider font-semibold">
-                      {formatDate(match.matchDate)}
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-white/30 mb-3 uppercase tracking-wider font-semibold">
+                        {formatDate(match.matchDate)}
+                      </div>
+                      {match.isLive && activeRound.status === "OPEN" && (
+                        <div className="px-2 py-0.5 rounded-full bg-wc-red/10 border border-wc-red/20 text-wc-red text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 mb-2">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-wc-red opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-wc-red"></span>
+                          </span>
+                          LIVE
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-5">
@@ -399,14 +409,12 @@ export default function PredictPage() {
                             )}
                             {!pointsMeta && hasPrediction && (
                               <div className="px-3 sm:px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-white/30 text-xs sm:text-sm font-bold flex items-center gap-2">
-                                <Clock className="w-4 h-4" />
-                                Pending
+                                <Clock className="w-4 h-4" /> Pending
                               </div>
                             )}
                             {!hasPrediction && (
                               <div className="px-3 sm:px-4 py-2 rounded-xl border border-wc-red/10 bg-wc-red/5 text-wc-red/70 text-xs sm:text-sm font-bold flex items-center gap-2">
-                                <XCircle className="w-4 h-4" />
-                                No Prediction
+                                <XCircle className="w-4 h-4" /> No Prediction
                               </div>
                             )}
                             {isDoubled && (
@@ -419,59 +427,24 @@ export default function PredictPage() {
                           <>
                             <div className="flex items-center gap-2">
                               <div className="relative">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={inp.home}
-                                  onChange={(e) =>
-                                    setInputs({ ...inputs, [match.id]: { ...inp, home: e.target.value } })
-                                  }
-                                  placeholder="0"
-                                  className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none focus:ring-1 focus:ring-wc-gold/20 transition"
-                                />
+                                <input type="number" min={0} value={inp.home} onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, home: e.target.value } })} placeholder="0" className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none focus:ring-1 focus:ring-wc-gold/20 transition" />
                                 {hasPrediction && match.prediction?.homeScore === Number(inp.home) && inp.home !== "" && (
                                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-wc-dark" />
                                 )}
                               </div>
                               <span className="text-white/20 font-bold">-</span>
                               <div className="relative">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={inp.away}
-                                  onChange={(e) =>
-                                    setInputs({ ...inputs, [match.id]: { ...inp, away: e.target.value } })
-                                  }
-                                  placeholder="0"
-                                  className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none focus:ring-1 focus:ring-wc-gold/20 transition"
-                                />
+                                <input type="number" min={0} value={inp.away} onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, away: e.target.value } })} placeholder="0" className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none focus:ring-1 focus:ring-wc-gold/20 transition" />
                                 {hasPrediction && match.prediction?.awayScore === Number(inp.away) && inp.away !== "" && (
                                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-wc-dark" />
                                 )}
                               </div>
-                              <button
-                                onClick={() => savePrediction(match.id)}
-                                disabled={saving[match.id]}
-                                className="h-12 px-3 sm:px-4 rounded-xl bg-wc-gold text-wc-dark font-bold hover:bg-wc-gold/90 transition disabled:opacity-50 flex items-center gap-1.5"
-                              >
-                                {saving[match.id] ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Save className="w-4 h-4" />
-                                )}
+                              <button onClick={() => savePrediction(match.id)} disabled={saving[match.id]} className="h-12 px-3 sm:px-4 rounded-xl bg-wc-gold text-wc-dark font-bold hover:bg-wc-gold/90 transition disabled:opacity-50 flex items-center gap-1.5">
+                                {saving[match.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                 <span className="hidden sm:inline text-sm">Save</span>
                               </button>
                             </div>
-
-                            <button
-                              onClick={() => setDoublePick(activeRound.id, match.id)}
-                              className={`h-12 w-12 rounded-xl flex items-center justify-center transition border ${
-                                isDoubled
-                                  ? "bg-wc-gold/20 border-wc-gold/40 text-wc-gold shadow-[0_0_15px_rgba(255,184,28,0.15)]"
-                                  : "bg-white/5 border-white/10 text-white/20 hover:text-white/60 hover:border-white/20"
-                              }`}
-                              title="Double points for this match"
-                            >
+                            <button onClick={() => setDoublePick(activeRound.id, match.id)} className={`h-12 w-12 rounded-xl flex items-center justify-center transition border ${isDoubled ? "bg-wc-gold/20 border-wc-gold/40 text-wc-gold shadow-[0_0_15px_rgba(255,184,28,0.15)]" : "bg-white/5 border-white/10 text-white/20 hover:text-white/60 hover:border-white/20"}`} title="Double points for this match">
                               <Star className={`w-5 h-5 ${isDoubled ? "fill-wc-gold" : ""}`} />
                             </button>
                           </>
@@ -485,7 +458,7 @@ export default function PredictPage() {
                     <div className="px-4 sm:px-5 lg:px-6 py-3 bg-white/[0.02] border-t border-white/5 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs text-white/30">
                         <Lock className="w-3.5 h-3.5" />
-                        Predictions locked — {activeRound.status === "LIVE" ? "live scoring active" : "round completed"}
+                        Predictions locked — {match.isLive && activeRound.status === "OPEN" ? "match is live" : activeRound.status === "LIVE" ? "live scoring active" : "round completed"}
                       </div>
                       {isDoubled && (
                         <div className="text-xs text-wc-gold/60 font-medium flex items-center gap-1">
@@ -511,22 +484,10 @@ export default function PredictPage() {
 
       {/* Legend */}
       <div className="mt-8 sm:mt-10 grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 max-w-2xl">
-        <div className="flex items-center gap-2 text-xs text-white/30">
-          <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-          Prediction saved
-        </div>
-        <div className="flex items-center gap-2 text-xs text-white/30">
-          <Star className="w-3 h-3 text-wc-gold fill-wc-gold shrink-0" />
-          Double pick
-        </div>
-        <div className="flex items-center gap-2 text-xs text-white/30">
-          <Trophy className="w-3 h-3 text-wc-gold shrink-0" />
-          Perfect = 6pts
-        </div>
-        <div className="flex items-center gap-2 text-xs text-white/30">
-          <Zap className="w-3 h-3 text-wc-blue shrink-0" />
-          Correct = 3pts
-        </div>
+        <div className="flex items-center gap-2 text-xs text-white/30"><div className="w-2 h-2 rounded-full bg-green-500 shrink-0" /> Prediction saved</div>
+        <div className="flex items-center gap-2 text-xs text-white/30"><Star className="w-3 h-3 text-wc-gold fill-wc-gold shrink-0" /> Double pick</div>
+        <div className="flex items-center gap-2 text-xs text-white/30"><Trophy className="w-3 h-3 text-wc-gold shrink-0" /> Perfect = 6pts</div>
+        <div className="flex items-center gap-2 text-xs text-white/30"><Zap className="w-3 h-3 text-wc-blue shrink-0" /> Correct = 3pts</div>
       </div>
     </div>
   );
