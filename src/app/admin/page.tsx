@@ -2,7 +2,18 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { Shield, Plus, Trash2, Save, Play, CheckCircle, Unlock, Loader2 } from "lucide-react";
+import {
+  Shield,
+  Plus,
+  Trash2,
+  Save,
+  Play,
+  CheckCircle,
+  Unlock,
+  Loader2,
+  Calendar,
+  Pencil,
+} from "lucide-react";
 
 type Round = {
   id: string;
@@ -44,8 +55,15 @@ export default function AdminPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [newRoundName, setNewRoundName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [newMatch, setNewMatch] = useState<Record<string, { homeTeam: string; awayTeam: string; matchDate: string }>>({});
-  const [scoreInputs, setScoreInputs] = useState<Record<string, { home: string; away: string }>>({});
+  const [newMatch, setNewMatch] = useState<
+    Record<string, { homeTeam: string; awayTeam: string; matchDate: string }>
+  >({});
+  const [scoreInputs, setScoreInputs] = useState<
+    Record<string, { home: string; away: string }>
+  >({});
+  const [matchInputs, setMatchInputs] = useState<
+    Record<string, { homeTeam: string; awayTeam: string; matchDate: string }>
+  >({});
   const [error, setError] = useState("");
 
   const fetchRounds = useCallback(async () => {
@@ -53,7 +71,7 @@ export default function AdminPage() {
       setError("");
       const data = await fetchJSON("/api/admin/rounds");
       setRounds(data.rounds || []);
-      // seed score inputs from fetched data
+      // seed score inputs
       setScoreInputs((prev) => {
         const init = { ...prev };
         (data.rounds || []).forEach((r: Round) => {
@@ -62,6 +80,22 @@ export default function AdminPage() {
               init[m.id] = {
                 home: m.homeScore !== null ? String(m.homeScore) : "",
                 away: m.awayScore !== null ? String(m.awayScore) : "",
+              };
+            }
+          });
+        });
+        return init;
+      });
+      // seed match detail inputs
+      setMatchInputs((prev) => {
+        const init = { ...prev };
+        (data.rounds || []).forEach((r: Round) => {
+          r.matches.forEach((m) => {
+            if (!(m.id in init)) {
+              init[m.id] = {
+                homeTeam: m.homeTeam,
+                awayTeam: m.awayTeam,
+                matchDate: m.matchDate ? new Date(m.matchDate).toISOString().slice(0, 16) : "",
               };
             }
           });
@@ -141,6 +175,28 @@ export default function AdminPage() {
     } catch (err: any) {
       console.error("addMatch error:", err);
       alert("Error adding match: " + (err.message || "Unknown error"));
+    }
+  };
+
+  const updateMatch = async (matchId: string) => {
+    const m = matchInputs[matchId];
+    if (!m) return;
+    try {
+      setError("");
+      await fetchJSON("/api/admin/matches", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: matchId,
+          homeTeam: m.homeTeam?.trim(),
+          awayTeam: m.awayTeam?.trim(),
+          matchDate: m.matchDate || null,
+        }),
+      });
+      await fetchRounds();
+      alert("Match details updated!");
+    } catch (err: any) {
+      console.error("updateMatch error:", err);
+      alert("Error updating match: " + (err.message || "Unknown error"));
     }
   };
 
@@ -262,56 +318,114 @@ export default function AdminPage() {
             </div>
 
             <div className="divide-y divide-white/5">
-              {round.matches.map((match) => (
-                <div key={match.id} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                    <div className="text-right font-semibold">{match.homeTeam}</div>
-                    <div className="text-white/30">vs</div>
-                    <div className="text-left font-semibold">{match.awayTeam}</div>
+              {round.matches.map((match) => {
+                const m = matchInputs[match.id] || {
+                  homeTeam: match.homeTeam,
+                  awayTeam: match.awayTeam,
+                  matchDate: match.matchDate ? new Date(match.matchDate).toISOString().slice(0, 16) : "",
+                };
+
+                return (
+                  <div key={match.id} className="px-6 py-4">
+                    {/* Match Details Row */}
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-3">
+                      <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={m.homeTeam}
+                          onChange={(e) =>
+                            setMatchInputs((prev) => ({
+                              ...prev,
+                              [match.id]: { ...prev[match.id], homeTeam: e.target.value },
+                            }))
+                          }
+                          className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none text-sm font-semibold"
+                          placeholder="Home Team"
+                        />
+                        <div className="flex items-center justify-center px-2 text-white/20 text-sm font-bold">VS</div>
+                        <input
+                          type="text"
+                          value={m.awayTeam}
+                          onChange={(e) =>
+                            setMatchInputs((prev) => ({
+                              ...prev,
+                              [match.id]: { ...prev[match.id], awayTeam: e.target.value },
+                            }))
+                          }
+                          className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none text-sm font-semibold"
+                          placeholder="Away Team"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-white/20" />
+                          <input
+                            type="datetime-local"
+                            value={m.matchDate}
+                            onChange={(e) =>
+                              setMatchInputs((prev) => ({
+                                ...prev,
+                                [match.id]: { ...prev[match.id], matchDate: e.target.value },
+                              }))
+                            }
+                            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none text-sm"
+                          />
+                          <button
+                            onClick={() => updateMatch(match.id)}
+                            className="p-2 rounded-lg bg-wc-blue/10 text-wc-blue hover:bg-wc-blue/20 transition border border-wc-blue/20"
+                            title="Update match details"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Score & Delete */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          type="number"
+                          min={0}
+                          value={scoreInputs[match.id]?.home ?? ""}
+                          onChange={(e) =>
+                            setScoreInputs((prev) => ({
+                              ...prev,
+                              [match.id]: { ...prev[match.id], home: e.target.value },
+                            }))
+                          }
+                          placeholder="H"
+                          className="w-16 text-center px-2 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none"
+                        />
+                        <span className="text-white/30">-</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={scoreInputs[match.id]?.away ?? ""}
+                          onChange={(e) =>
+                            setScoreInputs((prev) => ({
+                              ...prev,
+                              [match.id]: { ...prev[match.id], away: e.target.value },
+                            }))
+                          }
+                          placeholder="A"
+                          className="w-16 text-center px-2 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none"
+                        />
+                        <button
+                          onClick={() => updateScore(match.id)}
+                          className="p-2 rounded-lg bg-wc-gold/20 text-wc-gold hover:bg-wc-gold/30 transition"
+                          title="Update score"
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteMatch(match.id)}
+                          className="p-2 rounded-lg text-wc-red hover:bg-wc-red/10 transition"
+                          title="Delete match"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      value={scoreInputs[match.id]?.home ?? ""}
-                      onChange={(e) =>
-                        setScoreInputs((prev) => ({
-                          ...prev,
-                          [match.id]: { ...prev[match.id], home: e.target.value },
-                        }))
-                      }
-                      placeholder="H"
-                      className="w-16 text-center px-2 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none"
-                    />
-                    <span className="text-white/30">-</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={scoreInputs[match.id]?.away ?? ""}
-                      onChange={(e) =>
-                        setScoreInputs((prev) => ({
-                          ...prev,
-                          [match.id]: { ...prev[match.id], away: e.target.value },
-                        }))
-                      }
-                      placeholder="A"
-                      className="w-16 text-center px-2 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-wc-gold focus:outline-none"
-                    />
-                    <button
-                      onClick={() => updateScore(match.id)}
-                      className="p-2 rounded-lg bg-wc-gold/20 text-wc-gold hover:bg-wc-gold/30 transition"
-                    >
-                      <Save className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => deleteMatch(match.id)}
-                      className="p-2 rounded-lg text-wc-red hover:bg-wc-red/10 transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div className="px-6 py-4 bg-white/5 flex flex-col sm:flex-row gap-2">
                 <input
