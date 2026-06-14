@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: { userId: stri
 
   const matchesMap = new Map<string, any>();
   matchesSnap.docs.forEach((doc) => {
-    matchesMap.set(doc.id, { id: doc.id, ...doc.data() });
+    matchesMap.set(doc.id, { id: doc.id, ...doc.data() } as any);
   });
 
   const doubleSet = new Set<string>();
@@ -42,8 +42,19 @@ export async function GET(req: NextRequest, { params }: { params: { userId: stri
   });
 
   const predictions = predsSnap.docs.map((doc) => {
-    const d = doc.data();
-    const match = matchesMap.get(d.matchId);
+    const d = doc.data() as {
+      matchId: string;
+      homeScore: number;
+      awayScore: number;
+    };
+    const match = matchesMap.get(d.matchId) as {
+      homeTeam: string;
+      awayTeam: string;
+      matchDate: string;
+      homeScore: number | null;
+      awayScore: number | null;
+      isLive?: boolean;
+    };
     if (!match) return null;
 
     const base = calculatePoints(d, match);
