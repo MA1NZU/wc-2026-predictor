@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
   const roundDoc = await db.collection("rounds").doc(matchData.roundId).get();
   const roundData = roundDoc.data()!;
 
-  if (roundData.status === "LIVE" || roundData.status === "FINISHED") {
-    return NextResponse.json({ error: "Predictions are locked for this round" }, { status: 403 });
+  if (matchData.isLive || roundData.status === "LIVE" || roundData.status === "FINISHED") {
+    return NextResponse.json({ error: "Predictions are locked for this match" }, { status: 403 });
   }
 
   const predRef = db.collection("predictions").doc(`${user.userId}_${matchId}`);
