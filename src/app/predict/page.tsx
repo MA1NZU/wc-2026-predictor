@@ -100,13 +100,17 @@ function formatDate(dateStr: string) {
   });
 }
 
-function getPointsLabel(points: number | null) {
+function getPointsLabel(points: number | null, isDoubled: boolean) {
   if (points === null) return null;
   if (points === 0) return { text: "Miss", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
-  if (points === 3) return { text: "Outcome", color: "text-wc-blue", bg: "bg-wc-blue/10", border: "border-wc-blue/20" };
+  // Doubled
+  if (isDoubled) {
+    if (points === 12) return { text: "Perfect 2x", color: "text-wc-gold", bg: "bg-wc-gold/20", border: "border-wc-gold/30" };
+    if (points === 6) return { text: "Outcome 2x", color: "text-wc-blue", bg: "bg-wc-blue/20", border: "border-wc-blue/30" };
+  }
+  // Not doubled
   if (points === 6) return { text: "Perfect", color: "text-wc-gold", bg: "bg-wc-gold/10", border: "border-wc-gold/20" };
-  if (points === 12) return { text: "Perfect 2x", color: "text-wc-gold", bg: "bg-wc-gold/20", border: "border-wc-gold/30" };
-  if (points === 9) return { text: "Outcome 2x", color: "text-wc-blue", bg: "bg-wc-blue/20", border: "border-wc-blue/30" };
+  if (points === 3) return { text: "Outcome", color: "text-wc-blue", bg: "bg-wc-blue/10", border: "border-wc-blue/20" };
   return { text: `${points}pts`, color: "text-white", bg: "bg-white/5", border: "border-white/10" };
 }
 
@@ -309,7 +313,7 @@ export default function PredictPage() {
               // 🔥 KEY CHANGE: match-level isLive OR round-level LIVE/FINISHED
               const isLocked = match.isLive || activeRound.status === "LIVE" || activeRound.status === "FINISHED";
               const hasPrediction = match.prediction !== null;
-              const pointsMeta = getPointsLabel(match.points);
+              const pointsMeta = getPointsLabel(match.points, isDoubled);
               const isDoubled = match.doublePick;
 
               return (
