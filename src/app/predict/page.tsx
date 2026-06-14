@@ -98,16 +98,28 @@ function getCountryCode(name: string): string {
 function FlagImage({ team, size = 40 }: { team: string; size?: number }) {
   const code = getCountryCode(team);
   const url = `https://flagcdn.com/w${size}/${code}.png`;
+  const [error, setError] = useState(false);
+
+  if (error) {
+    return (
+      <div
+        className="w-full h-full flex items-center justify-center bg-white/10 text-white/60 font-bold text-[10px] sm:text-xs uppercase rounded-lg border border-white/10"
+        title={team}
+      >
+        {code}
+      </div>
+    );
+  }
+
   return (
     <img
       src={url}
       alt={team}
       width={size}
       height={size}
-      className="rounded-lg object-cover border border-white/10 bg-white/5"
-      onError={(e) => {
-        (e.target as HTMLImageElement).style.display = "none";
-      }}
+      className="w-full h-full object-cover rounded-lg"
+      onError={() => setError(true)}
+      loading="lazy"
     />
   );
 }
