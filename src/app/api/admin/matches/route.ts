@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { getUser } from "@/lib/auth";
 import { clearCache } from "@/lib/cache";
 
@@ -12,23 +12,27 @@ export async function POST(req: NextRequest) {
 
     const { roundId, homeTeam, awayTeam, matchDate, order } = await req.json();
 
-    const ref = db.collection("matches").doc();
-    await ref.set({
-      roundId,
-      homeTeam,
-      awayTeam,
-      matchDate: matchDate || new Date().toISOString(),
-      order: order || 0,
-      isLive: false,
-      createdAt: new Date(),
-    });
+    const { data: match, error } = await supabase
+      .from("matches")
+      .insert({
+        round_id: roundId,
+        home_team: homeTeam,
+        away_team: awayTeam,
+        match_date: matchDate || new Date().toISOString(),
+        order_num: order || 0,
+        is_live: false,
+      })
+      .select()
+      .single();
+
+    if (error || !match) {
+      return NextResponse.json({ error: "Failed to create match" }, { status: 500 });
+    }
 
     clearCache();
-
-    const doc = await ref.get();
-    return NextResponse.json({ match: { id: doc.id, ...doc.data() } });
-  } catch (err: any) {
-    console.error("Create match error:", err?.message || err);
+    return NextResponse.json({ match });
+  } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: "Failed to create match" }, { status: 500 });
   }
 }
@@ -41,21 +45,27 @@ export async function PATCH(req: NextRequest) {
     const { id, homeTeam, awayTeam, matchDate, order, isLive } = await req.json();
 
     const updateData: any = {};
-    if (homeTeam !== undefined) updateData.homeTeam = homeTeam;
-    if (awayTeam !== undefined) updateData.awayTeam = awayTeam;
-    if (matchDate !== undefined) updateData.matchDate = matchDate;
-    if (order !== undefined) updateData.order = order;
-    if (isLive !== undefined) updateData.isLive = isLive;
-    updateData.updatedAt = new Date();
+    if (homeTeam !== undefined) updateData.home_team = homeTeam;
+    if (awayTeam !== undefined) updateData.away_team = awayTeam;
+    if (matchDate !== undefined) updateData.match_date = matchDate;
+    if (order !== undefined) updateData.order_num = order;
+    if (isLive !== undefined) updateData.is_live = isLive;
 
-    await db.collection("matches").doc(id).update(updateData);
+    const { data: match, error } = await supabase
+      .from("matches")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error || !match) {
+      return NextResponse.json({ error: "Failed to update match" }, { status: 500 });
+    }
 
     clearCache();
-
-    const doc = await db.collection("matches").doc(id).get();
-    return NextResponse.json({ match: { id: doc.id, ...doc.data() } });
-  } catch (err: any) {
-    console.error("Update match error:", err?.message || err);
+    return NextResponse.json({ match });
+  } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: "Failed to update match" }, { status: 500 });
   }
 }
@@ -66,13 +76,13 @@ export async function DELETE(req: NextRequest) {
     if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { id } = await req.json();
-    await db.collection("matches").doc(id).delete();
+
+    await supabase.from("matches").delete().eq("id", id);
 
     clearCache();
-
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error("Delete match error:", err?.message || err);
+  } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: "Failed to delete match" }, { status: 500 });
   }
 }
