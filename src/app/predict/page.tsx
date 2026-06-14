@@ -47,7 +47,7 @@ function getFlag(team: string) {
     AUSTRIA: "🇦🇹", SERBIA: "🇷🇸", SWEDEN: "🇸🇪", NORWAY: "🇳🇴", CZECHIA: "🇨🇿",
     CZECH: "🇨🇿", HUNGARY: "🇭🇺", ROMANIA: "🇷🇴", SLOVAKIA: "🇸🇰", SLOVENIA: "🇸🇮",
     GREECE: "🇬🇷", TURKEY: "🇹🇷", IRELAND: "🇮🇪", NORTHERN: "🇬🇧", BOSNIA: "🇧🇦",
-    FINLAND: "🇫🇮", RUSSIA: "🇷🇺",
+    FINLAND: "🇫🇮", RUSSIA: "🇷🇺", ISRAEL: "🇮🇱",
 
     /* ---------- CONMEBOL (6) ---------- */
     ARGENTINA: "🇦🇷", BRAZIL: "🇧🇷", URUGUAY: "🇺🇾", COLOMBIA: "🇨🇴", ECUADOR: "🇪🇨",
@@ -86,7 +86,7 @@ function getFlag(team: string) {
 
     /* ---------- OFC (1) ---------- */
     "NEW ZEALAND": "🇳🇿", FIJI: "🇫🇯", PAPUA: "🇵🇬", NEWCALEDONIA: "🇳🇨", TAHITI: "🇵🇫",
-    SAMOA: "🇼🇸", VANUATU: "🇻🇺", SOLOMON: "🇸🇧", "SOUTH AFRICA": "🇿🇦", "TURKIYE": "🇹🇷", "SOUTH KOREA": "🇰🇷", "IVORY COAST": "🇨🇮", "CAPE VERDE": "🇨🇻", "SAUDI ARABIA": "🇸🇦", "DR CONGO": "🇨🇬",
+    SAMOA: "🇼🇸", VANUATU: "🇻🇺", SOLOMON: "🇸🇧",
   };
   const upper = team.toUpperCase().trim();
   return flags[upper] || flags[upper.slice(0, 3)] || "🏳️";
