@@ -15,11 +15,15 @@ export async function POST(req: NextRequest) {
   const roundDoc = await db.collection("rounds").doc(matchData.roundId).get();
   const roundData = roundDoc.data()!;
 
-  if (roundData.status === "LIVE" || roundData.status === "FINISHED") {
+  if (matchData.isLive || roundData.status === "LIVE" || roundData.status === "FINISHED") {
     return NextResponse.json({ error: "Round is locked" }, { status: 403 });
   }
 
-  const existing = await db.collection("doublePicks").where("userId", "==", user.userId).where("roundId", "==", roundId).get();
+  const existing = await db
+    .collection("doublePicks")
+    .where("userId", "==", user.userId)
+    .where("roundId", "==", roundId)
+    .get();
 
   const batch = db.batch();
   existing.docs.forEach((doc) => batch.delete(doc.ref));
