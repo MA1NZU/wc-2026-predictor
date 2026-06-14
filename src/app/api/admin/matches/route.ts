@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
     awayTeam,
     matchDate: matchDate || new Date().toISOString(),
     order: order || 0,
+    isLive: false,
     createdAt: new Date(),
   });
 
@@ -26,13 +27,14 @@ export async function PATCH(req: NextRequest) {
   const user = await getUser();
   if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { id, homeTeam, awayTeam, matchDate, order } = await req.json();
+  const { id, homeTeam, awayTeam, matchDate, order, isLive } = await req.json();
 
   const updateData: any = {};
   if (homeTeam !== undefined) updateData.homeTeam = homeTeam;
   if (awayTeam !== undefined) updateData.awayTeam = awayTeam;
   if (matchDate !== undefined) updateData.matchDate = matchDate;
   if (order !== undefined) updateData.order = order;
+  if (isLive !== undefined) updateData.isLive = isLive;
   updateData.updatedAt = new Date();
 
   await db.collection("matches").doc(id).update(updateData);
