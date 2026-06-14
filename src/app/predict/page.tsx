@@ -85,7 +85,7 @@ function getFlag(team: string) {
 
     /* ---------- OFC (1) ---------- */
     "NEW ZEALAND": "🇳🇿", FIJI: "🇫🇯", PAPUA: "🇵🇬", NEWCALEDONIA: "🇳🇨", TAHITI: "🇵🇫",
-    SAMOA: "🇼🇸", VANUATU: "🇻🇺", SOLOMON: "🇸🇧",
+    SAMOA: "🇼🇸", VANUATU: "🇻🇺", SOLOMON: "🇸🇧", "SOUTH AFRICA": "🇿🇦", "TURKIYE": "🇹🇷", "SOUTH KOREA": "🇰🇷", "IVORY COAST": "🇨🇮", "CAPE VERDE": "🇨🇻", "SAUDI ARABIA": "🇸🇦", "DR CONGO": "🇨🇬",
   };
   const upper = team.toUpperCase().trim();
   return flags[upper] || flags[upper.slice(0, 3)] || "🏳️";
