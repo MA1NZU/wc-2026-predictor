@@ -1,83 +1,99 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { getCache, setCache } from "@/lib/cache";
+import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 function calculatePoints(
-  pred: { homeScore: number; awayScore: number },
-  match: { homeScore: number | null; awayScore: number | null }
+  pred: { home_score: number; away_score: number },
+  match: { home_score: number | null; away_score: number | null }
 ) {
-  if (match.homeScore === null || match.awayScore === null) return 0;
-  if (pred.homeScore === match.homeScore && pred.awayScore === match.awayScore) return 6;
+  if (match.home_score === null || match.away_score === null) return 0;
+  if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
-  const predOutcome = pred.homeScore > pred.awayScore ? "home" : pred.homeScore < pred.awayScore ? "away" : "draw";
-  const actOutcome = match.homeScore > match.awayScore ? "home" : match.homeScore < match.awayScore ? "away" : "draw";
+  const predOutcome = pred.home_score > pred.away_score ? "home" : pred.home_score < pred.away_score ? "away" : "draw";
+  const actOutcome = match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
 
   if (predOutcome === actOutcome) return 3;
   return 0;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
   try {
-    const cached = getCache<any>("leaderboard", 60_000);
-    if (cached) return NextResponse.json({ leaderboard: cached });
+    const { userId } = params;
 
-    const [usersSnap, predsSnap, dpSnap, matchesSnap] = await Promise.all([
-      db.collection("users").get(),
-      db.collection("predictions").get(),
-      db.collection("doublePicks").get(),
-      db.collection("matches").get(),
-    ]);
+    const { data: user } = await supabase
+      .from("users")
+      .select("id, username")
+      .eq("id", userId)
+      .single();
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const { data: predictions } = await supabase
+      .from("predictions")
+      .select("*")
+      .eq("user_id", userId);
+
+    const { data: matches } = await supabase.from("matches").select("*");
+    const { data: doublePicks } = await supabase
+      .from("double_picks")
+      .select("*")
+      .eq("user_id", userId);
 
     const matchesMap = new Map<string, any>();
-    matchesSnap.docs.forEach((doc) => {
-      matchesMap.set(doc.id, { id: doc.id, ...doc.data() } as any);
-    });
+    (matches || []).forEach((m: any) => matchesMap.set(m.id, m));
 
-    const doubleMap = new Map<string, Set<string>>();
-    dpSnap.docs.forEach((doc) => {
-      const d = doc.data();
-      if (!doubleMap.has(d.userId)) doubleMap.set(d.userId, new Set());
-      doubleMap.get(d.userId)!.add(d.matchId);
-    });
+    const doubleSet = new Set<string>();
+    (doublePicks || []).forEach((d: any) => doubleSet.add(d.match_id));
 
-    const userPreds = new Map<string, any[]>();
-    predsSnap.docs.forEach((doc) => {
-      const d = doc.data();
-      if (!userPreds.has(d.userId)) userPreds.set(d.userId, []);
-      userPreds.get(d.userId)!.push(d);
-    });
+    const predictionsDetail = (predictions || [])
+      .map((pred: any) => {
+        const match = matchesMap.get(pred.match_id);
+        if (!match) return null;
 
-    const leaderboard = usersSnap.docs.map((doc) => {
-      const data = doc.data();
-      let totalPoints = 0;
-      const preds = userPreds.get(doc.id) || [];
-      const userDoubles = doubleMap.get(doc.id) || new Set<string>();
-
-      for (const pred of preds) {
-        const match = matchesMap.get(pred.matchId);
-        if (!match) continue;
         const base = calculatePoints(pred, match);
-        const isDoubled = userDoubles.has(pred.matchId);
-        totalPoints += base * (isDoubled ? 2 : 1);
-      }
+        const isDoubled = doubleSet.has(pred.match_id);
+        const points = base * (isDoubled ? 2 : 1);
 
-      return {
-        id: doc.id,
-        username: data.username,
-        totalPoints,
-        predictionsCount: preds.length,
-      };
+        return {
+          id: pred.id,
+          matchId: pred.match_id,
+          homeTeam: match.home_team,
+          awayTeam: match.away_team,
+          matchDate: match.match_date,
+          homeScore: match.home_score,
+          awayScore: match.away_score,
+          isLive: match.is_live || false,
+          predictedHome: pred.home_score,
+          predictedAway: pred.away_score,
+          isDoubled,
+          basePoints: base,
+          points,
+          hasScore: match.home_score !== null && match.away_score !== null,
+        };
+      })
+      .filter(Boolean);
+
+    predictionsDetail.sort(
+      (a: any, b: any) =>
+        new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
+    );
+
+    let totalPoints = 0;
+    predictionsDetail.forEach((p: any) => {
+      totalPoints += p.points;
     });
 
-    leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
-
-    setCache("leaderboard", leaderboard, 60_000);
-    return NextResponse.json({ leaderboard });
-  } catch (err: any) {
-    console.error("Leaderboard error:", err?.message || err);
-    // Return empty leaderboard so the page doesn't crash
-    return NextResponse.json({ leaderboard: [] });
+    return NextResponse.json({
+      user: { id: user.id, username: user.username },
+      totalPoints,
+      predictionsCount: predictionsDetail.length,
+      predictions: predictionsDetail,
+    });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
