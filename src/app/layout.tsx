@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   description: "Predict World Cup 2026 scores and compete with friends!",
   icons: {
     icon: "/icon.png",
+    apple: "/icon.png",
   },
 };
 
