@@ -1,102 +1,75 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
+import { getCache, setCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
 function calculatePoints(
-  pred: { homeScore: number; awayScore: number },
-  match: { homeScore: number | null; awayScore: number | null }
+  pred: { home_score: number; away_score: number },
+  match: { home_score: number | null; away_score: number | null }
 ) {
-  if (match.homeScore === null || match.awayScore === null) return 0;
-  if (pred.homeScore === match.homeScore && pred.awayScore === match.awayScore) return 6;
+  if (match.home_score === null || match.away_score === null) return 0;
+  if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
-  const predOutcome = pred.homeScore > pred.awayScore ? "home" : pred.homeScore < pred.awayScore ? "away" : "draw";
-  const actOutcome = match.homeScore > match.awayScore ? "home" : match.homeScore < match.awayScore ? "away" : "draw";
+  const predOutcome = pred.home_score > pred.away_score ? "home" : pred.home_score < pred.away_score ? "away" : "draw";
+  const actOutcome = match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
 
   if (predOutcome === actOutcome) return 3;
   return 0;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET() {
   try {
-    const { userId } = params;
+    const cached = getCache<any>("leaderboard", 60_000);
+    if (cached) return NextResponse.json({ leaderboard: cached });
 
-    const [userSnap, predsSnap, matchesSnap, dpSnap] = await Promise.all([
-      db.collection("users").doc(userId).get(),
-      db.collection("predictions").where("userId", "==", userId).get(),
-      db.collection("matches").get(),
-      db.collection("doublePicks").where("userId", "==", userId).get(),
-    ]);
-
-    if (!userSnap.exists) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const userData = userSnap.data()!;
+    const { data: users } = await supabase.from("users").select("id, username");
+    const { data: predictions } = await supabase.from("predictions").select("*");
+    const { data: doublePicks } = await supabase.from("double_picks").select("*");
+    const { data: matches } = await supabase.from("matches").select("*");
 
     const matchesMap = new Map<string, any>();
-    matchesSnap.docs.forEach((doc) => {
-      matchesMap.set(doc.id, { id: doc.id, ...doc.data() });
+    (matches || []).forEach((m: any) => matchesMap.set(m.id, m));
+
+    const doubleMap = new Map<string, Set<string>>();
+    (doublePicks || []).forEach((d: any) => {
+      if (!doubleMap.has(d.user_id)) doubleMap.set(d.user_id, new Set());
+      doubleMap.get(d.user_id)!.add(d.match_id);
     });
 
-    const doubleSet = new Set<string>();
-    dpSnap.docs.forEach((doc) => {
-      doubleSet.add(doc.data().matchId);
+    const userPreds = new Map<string, any[]>();
+    (predictions || []).forEach((p: any) => {
+      if (!userPreds.has(p.user_id)) userPreds.set(p.user_id, []);
+      userPreds.get(p.user_id)!.push(p);
     });
 
-    const predictions = predsSnap.docs.map((doc) => {
-      const d = doc.data() as {
-        matchId: string;
-        homeScore: number;
-        awayScore: number;
-      };
-      const match = matchesMap.get(d.matchId) as {
-        homeTeam: string;
-        awayTeam: string;
-        matchDate: string;
-        homeScore: number | null;
-        awayScore: number | null;
-        isLive?: boolean;
-      };
-      if (!match) return null;
+    const leaderboard = (users || []).map((user: any) => {
+      let totalPoints = 0;
+      const preds = userPreds.get(user.id) || [];
+      const userDoubles = doubleMap.get(user.id) || new Set<string>();
 
-      const base = calculatePoints(d, match);
-      const isDoubled = doubleSet.has(d.matchId);
-      const points = base !== null ? base * (isDoubled ? 2 : 1) : null;
+      for (const pred of preds) {
+        const match = matchesMap.get(pred.match_id);
+        if (!match) continue;
+        const base = calculatePoints(pred, match);
+        const isDoubled = userDoubles.has(pred.match_id);
+        totalPoints += base * (isDoubled ? 2 : 1);
+      }
 
       return {
-        id: doc.id,
-        matchId: d.matchId,
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
-        matchDate: match.matchDate,
-        homeScore: match.homeScore,
-        awayScore: match.awayScore,
-        isLive: match.isLive || false,
-        predictedHome: d.homeScore,
-        predictedAway: d.awayScore,
-        isDoubled,
-        basePoints: base,
-        points,
-        hasScore: match.homeScore !== null && match.awayScore !== null,
+        id: user.id,
+        username: user.username,
+        totalPoints,
+        predictionsCount: preds.length,
       };
-    }).filter(Boolean);
-
-    predictions.sort((a: any, b: any) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
-
-    let totalPoints = 0;
-    predictions.forEach((p: any) => {
-      if (p.points !== null) totalPoints += p.points;
     });
 
-    return NextResponse.json({
-      user: { id: userSnap.id, username: userData.username },
-      totalPoints,
-      predictionsCount: predictions.length,
-      predictions,
-    });
+    leaderboard.sort((a: any, b: any) => b.totalPoints - a.totalPoints);
+
+    setCache("leaderboard", leaderboard, 60_000);
+    return NextResponse.json({ leaderboard });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ leaderboard: [] });
   }
 }
