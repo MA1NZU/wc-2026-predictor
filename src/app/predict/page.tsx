@@ -37,7 +37,6 @@ type Round = {
   matches: Match[];
 };
 
-// Simple flag helper using country codes (fallback to first 2 letters)
 function getFlag(team: string) {
   const flags: Record<string, string> = {
     USA: "🇺🇸", MEX: "🇲🇽", CAN: "🇨🇦", ARG: "🇦🇷", BRA: "🇧🇷", URU: "🇺🇾",
@@ -353,7 +352,7 @@ export default function PredictPage() {
                                 <Medal className={`w-4 h-4 ${pointsMeta.color}`} />
                                 <div>
                                   <div className={`text-sm font-bold ${pointsMeta.color}`}>{pointsMeta.text}</div>
-                                  <div className={`text-xs ${pointsMeta.color} opacity-60">{match.points} pts</div>
+                                  <div className={`text-xs ${pointsMeta.color} opacity-60`}>{match.points} pts</div>
                                 </div>
                               </div>
                             )}
