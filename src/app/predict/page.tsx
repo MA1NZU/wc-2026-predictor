@@ -71,7 +71,10 @@ const COUNTRY_CODES: Record<string, string> = {
   GIBRALTAR: "gi", KOSOVO: "xk", MARTINIQUE: "mq", GUADELOUPE: "gp", FRENCH: "gf",
   REUNION: "re", MAYOTTE: "yt", CURACAO: "cw", ARUBA: "aw", BONAIRE: "bq",
   SURINAME: "sr", GUYANA: "gy", CUBA: "cu", DOMINICAN: "do", PUERTO: "pr",
-  VENEZUELA: "ve", BERMUDA: "bm", CANADA: "ca", USA: "us", MEXICO: "mx",
+  BERMUDA: "bm", HAITI: "ht", JAMAICA: "jm", HONDURAS: "hn", PANAMA: "pa",
+  COSTA: "cr", RICA: "cr", SALVADOR: "sv", TRINIDAD: "tt", GUATEMALA: "gt",
+  NICARAGUA: "ni", BELIZE: "bz", BARBADOS: "bb", DOMINICA: "dm", GRENADA: "gd",
+  STLUCIA: "lc", SVG: "vc", ANTIGUA: "ag", STKITTS: "kn", BAHAMAS: "bs",
 };
 
 function getCountryCode(name: string): string {
