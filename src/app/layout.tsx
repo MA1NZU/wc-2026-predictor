@@ -7,11 +7,18 @@ import { AuthProvider } from "@/components/AuthProvider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "World Cup 2026 Predictor",
+  title: "RUNIT WC 2026",
   description: "Predict World Cup 2026 scores and compete with friends!",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="en">
       <body className={inter.className}>
