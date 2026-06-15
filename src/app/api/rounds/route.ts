@@ -1,63 +1,63 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 import { getUser } from "@/lib/auth";
-import { getCache, setCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const user = await getUser();
-    const cacheKey = `rounds-data-${Math.floor(Date.now() / 60_000)}`;
-    const cachedData = getCache<any>(cacheKey, 60_000);
+    console.log(`>>> [API] Fetching rounds for User: ${user?.userId || "Guest"}`);
 
-    let roundsData: any[] = [];
-    let matchesData: any[] = [];
+    // 1. Fetch Rounds & Matches
+    const roundsSnap = await db.collection("rounds").orderBy("order", "asc").get();
+    const matchesSnap = await db.collection("matches").orderBy("order", "asc").get();
 
-    if (cachedData) {
-      roundsData = cachedData.rounds;
-      matchesData = cachedData.matches;
-    } else {
-      // Fetch from Firestore
-      const roundsSnap = await db.collection("rounds").orderBy("order", "asc").get();
-      const matchesSnap = await db.collection("matches").orderBy("order", "asc").get();
+    const roundsData = roundsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const matchesData = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      roundsData = roundsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      matchesData = matchesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-
-      setCache(cacheKey, { rounds: roundsData, matches: matchesData }, 60_000);
-    }
-
-    // If user is logged in, fetch their predictions & double picks
     let predictionsMap = new Map<string, any>();
     let doublePicksSet = new Set<string>();
 
-    if (user) {
+    // 2. Fetch User Predictions
+    if (user && user.userId) {
+      console.log(`>>> [DB] Querying predictions where user_id == "${user.userId}"`);
+      
       const predSnap = await db
         .collection("predictions")
         .where("user_id", "==", user.userId)
         .get();
 
-      const doubleSnap = await db
-        .collection("double_picks")
-        .where("user_id", "==", user.userId)
-        .get();
+      if (predSnap.empty) {
+        console.log(`>>> [DB] NO predictions found. Checking if the table has data...`);
+        const anyPred = await db.collection("predictions").limit(1).get();
+        if (!anyPred.empty) {
+           console.log(`>>> [DB] Sample found. Fields:`, Object.keys(anyPred.docs[0].data()));
+        }
+      }
 
-      predSnap.forEach((doc) => {
+      predSnap.forEach(doc => {
         const data = doc.data() as any;
-        predictionsMap.set(data.match_id, { id: doc.id, ...data });
+        // FIX: Check for both "match_id" and "matchId"
+        const matchKey = data.match_id || data.matchId || data.matchID;
+        if (matchKey) {
+          predictionsMap.set(matchKey, { id: doc.id, ...data });
+        }
       });
 
-      doubleSnap.forEach((doc) => {
+      // Fetch Double Picks
+      const doubleSnap = await db.collection("double_picks").where("user_id", "==", user.userId).get();
+      doubleSnap.forEach(doc => {
         const data = doc.data() as any;
-        doublePicksSet.add(data.match_id);
+        const matchKey = data.match_id || data.matchId;
+        if (matchKey) doublePicksSet.add(matchKey);
       });
     }
 
-    // Merge everything
+    // 3. Merge Data
     const rounds = roundsData.map((round: any) => {
-      const roundMatches = matchesData.filter(
-        (m) => m.round_id === round.id || m.roundId === round.id
+      const roundMatches = matchesData.filter(m => 
+        m.round_id === round.id || m.roundId === round.id
       );
 
       return {
@@ -67,21 +67,21 @@ export async function GET() {
         order: round.order_num || round.order || 0,
         matches: roundMatches.map((match: any) => {
           const pred = predictionsMap.get(match.id) || null;
-          const double = doublePicksSet.has(match.id);
+          const isDoubled = doublePicksSet.has(match.id);
 
-                    return {
+          return {
             id: match.id,
-            // FIX: Safely fallback if field name differs or is missing
             homeTeam: match.home_team || match.homeTeam || "TBD",
             awayTeam: match.away_team || match.awayTeam || "TBD",
-            matchDate: match.match_date || match.matchDate || new Date().toISOString(),
-            homeScore: match.home_score ?? match.homeScore ?? null,
-            awayScore: match.away_score ?? match.awayScore ?? null,
-            isLive: match.is_live ?? match.isLive ?? false,
-            prediction: pred
-              ? { homeScore: pred.home_score, awayScore: pred.away_score }
-              : null,
-            doublePick: double,
+            matchDate: match.match_date || match.matchDate,
+            homeScore: match.home_score ?? null,
+            awayScore: match.away_score ?? null,
+            isLive: match.is_live ?? false,
+            prediction: pred ? { 
+               homeScore: pred.home_score ?? pred.homeScore, 
+               awayScore: pred.away_score ?? pred.awayScore 
+            } : null,
+            doublePick: isDoubled,
             points: null,
           };
         }),
@@ -90,7 +90,7 @@ export async function GET() {
 
     return NextResponse.json({ rounds });
   } catch (error) {
-    console.error("Error fetching rounds:", error);
-    return NextResponse.json({ rounds: [] }, { status: 500 });
+    console.error(">>> [ERROR]", error);
+    return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
 }
