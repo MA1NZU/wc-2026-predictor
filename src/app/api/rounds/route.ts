@@ -13,8 +13,9 @@ export async function GET() {
     const roundsSnap = await db.collection("rounds").orderBy("order", "asc").get();
     const matchesSnap = await db.collection("matches").orderBy("order", "asc").get();
 
-    const roundsData = roundsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const matchesData = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // FIX: Explicitly type as any[] so TypeScript allows accessing dynamic fields
+    const roundsData: any[] = roundsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const matchesData: any[] = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     let predictionsMap = new Map<string, any>();
     let doublePicksSet = new Set<string>();
@@ -29,16 +30,12 @@ export async function GET() {
         .get();
 
       if (predSnap.empty) {
-        console.log(`>>> [DB] NO predictions found. Checking if the table has data...`);
-        const anyPred = await db.collection("predictions").limit(1).get();
-        if (!anyPred.empty) {
-           console.log(`>>> [DB] Sample found. Fields:`, Object.keys(anyPred.docs[0].data()));
-        }
+        console.log(`>>> [DB] No predictions found for this user.`);
       }
 
       predSnap.forEach(doc => {
         const data = doc.data() as any;
-        // FIX: Check for both "match_id" and "matchId"
+        // Handle both snake_case and camelCase field names
         const matchKey = data.match_id || data.matchId || data.matchID;
         if (matchKey) {
           predictionsMap.set(matchKey, { id: doc.id, ...data });
@@ -56,7 +53,8 @@ export async function GET() {
 
     // 3. Merge Data
     const rounds = roundsData.map((round: any) => {
-      const roundMatches = matchesData.filter(m => 
+      // FIX: Type 'm' as any to allow accessing round_id or roundId
+      const roundMatches = matchesData.filter((m: any) => 
         m.round_id === round.id || m.roundId === round.id
       );
 
@@ -90,7 +88,7 @@ export async function GET() {
 
     return NextResponse.json({ rounds });
   } catch (error) {
-    console.error(">>> [ERROR]", error);
+    console.error(">>> [API ERROR]", error);
     return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
 }
