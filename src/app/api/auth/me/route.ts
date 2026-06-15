@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getUser } from "@/lib/auth";
 import { db } from "@/lib/firebase";
+import { getUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,26 +12,28 @@ export async function GET() {
       return NextResponse.json({ user: null }, { status: 401 });
     }
 
-    // Firebase Admin: Fetch user document directly by ID
-    const userRef = db.collection("users").doc(payload.userId);
-    const userSnap = await userRef.get();
+    // Fetch user from Firestore
+    const userSnap = await db.collection("users").doc(payload.userId).get();
 
     if (!userSnap.exists) {
       return NextResponse.json({ user: null }, { status: 401 });
     }
 
-    const user = { id: userSnap.id, ...userSnap.data() } as any;
+    const userData = userSnap.data() as any;
+
+    // FIX: Check BOTH field names
+    const isAdmin = userData.is_admin === true || userData.isAdmin === true;
 
     return NextResponse.json({
       user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        isAdmin: user.is_admin,
+        id: userSnap.id,
+        email: userData.email,
+        username: userData.username,
+        isAdmin: isAdmin, // Return the correct boolean
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching user:", error);
     return NextResponse.json({ user: null }, { status: 500 });
   }
 }
