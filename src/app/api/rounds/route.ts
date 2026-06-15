@@ -4,13 +4,14 @@ import { getUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// Helper to calculate points (Must be in this file now)
+// FIX: Return null if match hasn't been played, so frontend shows "Pending"
 function calculatePoints(
   pred: { home_score?: number; away_score?: number },
   match: { home_score?: number | null; away_score?: number | null }
 ) {
-  if (match.home_score == null || match.away_score == null) return 0;
-  if (pred.home_score == null || pred.away_score == null) return 0;
+  // If match score is missing, points cannot be calculated yet
+  if (match.home_score == null || match.away_score == null) return null;
+  if (pred.home_score == null || pred.away_score == null) return null;
 
   // Exact score match = 6 pts
   if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
@@ -31,13 +32,14 @@ function calculatePoints(
 
   // Correct winner/draw = 3 pts
   if (predOutcome === actOutcome) return 3;
-  return 0;
+  
+  // Wrong outcome = 0 pts (This is a real Miss)
+  return 0; 
 }
 
 export async function GET() {
   try {
     const user = await getUser();
-    console.log(`>>> [ROUNDS] Fetching data for: ${user?.userId || "Guest"}`);
 
     // 1. Fetch Rounds & Matches
     const roundsSnap = await db.collection("rounds").orderBy("order", "asc").get();
@@ -61,9 +63,7 @@ export async function GET() {
         predSnap.forEach((doc: any) => {
           const data = doc.data() as any;
           const matchKey = data.match_id || data.matchId;
-          if (matchKey) {
-            predictionsMap.set(matchKey, { id: doc.id, ...data });
-          }
+          if (matchKey) predictionsMap.set(matchKey, { id: doc.id, ...data });
         });
       }
 
@@ -82,7 +82,7 @@ export async function GET() {
       }
     }
 
-    // 3. Merge Data & Calculate Points
+    // 3. Merge Data
     const rounds = roundsData.map((round: any) => {
       const roundMatches = matchesData.filter((m: any) => 
         (m.round_id || m.roundId) === round.id
@@ -97,11 +97,12 @@ export async function GET() {
           const pred = predictionsMap.get(match.id) || null;
           const isDoubled = doublePicksSet.has(match.id);
 
-          // FIX: Calculate points NOW instead of returning null
+          // FIX: calculatePoints will return null if match.home_score is null
           let points = null;
-          if (pred && match.home_score !== null && match.away_score !== null) {
+          if (pred) {
              points = calculatePoints(pred, match);
-             if (isDoubled) points *= 2;
+             // Only double if points exist (not null) and are > 0
+             if (points !== null && isDoubled) points *= 2;
           }
 
           return {
@@ -117,7 +118,7 @@ export async function GET() {
                awayScore: pred.away_score ?? pred.awayScore 
             } : null,
             doublePick: isDoubled,
-            points: points, // This is what makes the "Perfect/Outcome" badges appear!
+            points: points, // Will be null for unplayed, 0 for miss, 3/6 for hit
           };
         }),
       };
