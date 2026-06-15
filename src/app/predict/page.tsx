@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useGameContext } from "@/context/GameContext"; // Import the shared real-time context
 import {
   Swords,
   Lock,
@@ -27,7 +28,7 @@ type Match = {
   awayScore: number | null;
   prediction: { homeScore: number; awayScore: number } | null;
   doublePick: boolean;
-  points: number | null;
+  points: number | null; // null = pending, 0 = miss, >0 = success
   isLive?: boolean;
 };
 
@@ -39,29 +40,23 @@ type Round = {
 };
 
 function getFlag(team: string) {
-  if (!team) return "🏳️"; // Safety check for undefined teams
+  if (!team) return "🏳️";
   const upper = team.toUpperCase().trim();
-  
+
   const flags: Record<string, string> = {
-     FRANCE: "🇫🇷", GERMANY: "🇩🇪", ENGLAND: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SPAIN: "🇪🇸", PORTUGAL: "🇵🇹",
+    FRANCE: "🇫🇷", GERMANY: "🇩🇪", ENGLAND: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SPAIN: "🇪🇸", PORTUGAL: "🇵🇹",
     NETHERLANDS: "🇳🇱", BELGIUM: "🇧🇪", ITALY: "🇮🇹", CROATIA: "🇭🇷", DENMARK: "🇩🇰",
     SWITZERLAND: "🇨🇭", POLAND: "🇵🇱", WALES: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", SCOTLAND: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", UKRAINE: "🇺🇦",
     AUSTRIA: "🇦🇹", SERBIA: "🇷🇸", SWEDEN: "🇸🇪", NORWAY: "🇳🇴", CZECHIA: "🇨🇿",
     CZECH: "🇨🇿", HUNGARY: "🇭🇺", ROMANIA: "🇷🇴", SLOVAKIA: "🇸🇰", SLOVENIA: "🇸🇮",
     GREECE: "🇬🇷", TURKEY: "🇹🇷", IRELAND: "🇮🇪", NORTHERN: "🇬🇧", BOSNIA: "🇧🇦",
     FINLAND: "🇫🇮", RUSSIA: "🇷🇺", "SOUTH AFRICA": "🇿🇦", "TURKIYE": "🇹🇷", "SOUTH KOREA": "🇰🇷", "IVORY COAST": "🇨🇮", "CAPE VERDE": "🇨🇻", "SAUDI ARABIA": "🇸🇦", "DR CONGO": "🇨🇬",
-
-    /* ---------- CONMEBOL (6) ---------- */
     ARGENTINA: "🇦🇷", BRAZIL: "🇧🇷", URUGUAY: "🇺🇾", COLOMBIA: "🇨🇴", ECUADOR: "🇪🇨",
-    CHILE: "🇨🇱", PERU: "🇵🇪", PARAGUAY: "🇵🇾", BOLIVIA: "🇧🇴", VENEZUELA: "🇻🇪", 
-
-    /* ---------- CONCACAF (9 incl. 3 hosts) ---------- */
+    CHILE: "🇨🇱", PERU: "🇵🇪", PARAGUAY: "🇵🇾", BOLIVIA: "🇧🇴", VENEZUELA: "🇻🇪",
     USA: "🇺🇸", CANADA: "🇨🇦", MEXICO: "🇲🇽", PANAMA: "🇵🇦", COSTA: "🇨🇷",
     RICA: "🇨🇷", HONDURAS: "🇭🇳", JAMAICA: "🇯🇲", EL: "🇸🇻", SALVADOR: "🇸🇻",
     GUATEMALA: "🇬🇹", HAITI: "🇭🇹", TRINIDAD: "🇹🇹", CUBA: "🇨🇺", CURACAO: "🇨🇼",
     NICARAGUA: "🇳🇮", BERMUDA: "🇧🇲",
-
-    /* ---------- CAF (9) ---------- */
     MOROCCO: "🇲🇦", EGYPT: "🇪🇬", SENEGAL: "🇸🇳", TUNISIA: "🇹🇳", ALGERIA: "🇩🇿",
     NIGERIA: "🇳🇬", CAMEROON: "🇨🇲", GHANA: "🇬🇭", IVORY: "🇨🇮", COTE: "🇨🇮",
     "CÔTE D'IVOIRE": "🇨🇮", MALI: "🇲🇱", BURKINA: "🇧🇫", SOUTH: "🇿🇦", KENYA: "🇰🇪",
@@ -73,8 +68,6 @@ function getFlag(team: string) {
     CHAD: "🇹🇩", ERITREA: "🇪🇷", DJIBOUTI: "🇩🇯", CENTRAL: "🇨🇫", EQUATORIAL: "🇬🇶",
     SAO: "🇸🇹", CAPE: "🇨🇻", SEYCHELLES: "🇸🇨", MAURITIUS: "🇲🇺", BURUNDI: "🇧🇮",
     SOMALIA: "🇸🇴", SOUTHSUDAN: "🇸🇸", "SOUTH SUDAN": "🇸🇸",
-
-    /* ---------- AFC (8) ---------- */
     JAPAN: "🇯🇵", KOREA: "🇰🇷", AUSTRALIA: "🇦🇺", IRAN: "🇮🇷", SAUDI: "🇸🇦",
     ARABIA: "🇸🇦", QATAR: "🇶🇦", IRAQ: "🇮🇶", UZBEKISTAN: "🇺🇿", JORDAN: "🇯🇴",
     UAE: "🇦🇪", BAHRAIN: "🇧🇭", CHINA: "🇨🇳", THAILAND: "🇹🇭", INDONESIA: "🇮🇩",
@@ -85,8 +78,6 @@ function getFlag(team: string) {
     PAKISTAN: "🇵🇰", SRI: "🇱🇰", BHUTAN: "🇧🇹", MALDIVES: "🇲🇻", GUAM: "🇬🇺",
     CAMBODIA: "🇰🇭", LAOS: "🇱🇦", MYANMAR: "🇲🇲", BRUNEI: "🇧🇳", PHILIPPINES: "🇵🇭",
     NORTH: "🇰🇵",
-
-    /* ---------- OFC (1) ---------- */
     "NEW ZEALAND": "🇳🇿", FIJI: "🇫🇯", PAPUA: "🇵🇬", NEWCALEDONIA: "🇳🇨", TAHITI: "🇵🇫",
     SAMOA: "🇼🇸", VANUATU: "🇻🇺", SOLOMON: "🇸🇧",
   };
@@ -94,7 +85,7 @@ function getFlag(team: string) {
 }
 
 function formatDate(dateStr: string) {
-  if (!dateStr) return "Date TBD"; // Safety check for missing dates
+  if (!dateStr) return "Date TBD";
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-US", {
     weekday: "short", month: "short", day: "numeric",
@@ -103,44 +94,46 @@ function formatDate(dateStr: string) {
 }
 
 function getPointsLabel(points: number | null, isDoubled: boolean) {
-  if (points === null) return null;
+  if (points === null) return null; // Pending
   if (points === 0) return { text: "Miss", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
+  
   // Doubled
   if (isDoubled) {
     if (points === 12) return { text: "Perfect 2x", color: "text-yellow-400", bg: "bg-yellow-400/20", border: "border-yellow-400/30" };
     if (points === 6) return { text: "Outcome 2x", color: "text-blue-400", bg: "bg-blue-400/20", border: "border-blue-400/30" };
   }
+  
   // Not doubled
   if (points === 6) return { text: "Perfect", color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20" };
   if (points === 3) return { text: "Outcome", color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20" };
+  
   return { text: `${points}pts`, color: "text-white", bg: "bg-white/5", border: "border-white/10" };
 }
 
 export default function PredictPage() {
   const { user, loading: authLoading } = useAuth();
-  const [rounds, setRounds] = useState<Round[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  // Read from Context (Real-time)
+  const { myRounds, loading: contextLoading } = useGameContext();
+
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [inputs, setInputs] = useState<Record<string, { home: string; away: string }>>({});
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
-  const fetchRounds = useCallback(async () => {
-    const res = await fetch("/api/rounds", { cache: "no-store" });
-    if (res.ok) {
-      const data = await res.json();
-      const sortedRounds = (data.rounds || []).map((r: Round) => ({
-        ...r,
-        matches: [...r.matches].sort(
-          (a: Match, b: Match) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
-        ),
-      }));
+  // Sync inputs from Context when data changes
+  useEffect(() => {
+    if (myRounds && myRounds.length > 0) {
+      // Set active tab if not set
+      if (!activeTab) {
+        setActiveTab(myRounds[0].id);
+      }
 
-      setRounds(sortedRounds);
-
-      // FIXED: Properly merge existing inputs with newly fetched predictions
+      // Populate input fields if user has predictions
       setInputs((prev) => {
-        const newInputs = { ...prev };
-        sortedRounds.forEach((r: Round) => {
+        // Don't overwrite if user has typed (unless inputs empty)
+        if (Object.keys(prev).length > 0 && Object.values(prev).some(v => v.home !== "" || v.away !== "")) return prev;
+
+        const newInputs: Record<string, { home: string; away: string }> = {};
+        myRounds.forEach((r: Round) => {
           r.matches.forEach((m: Match) => {
             if (m.prediction) {
               newInputs[m.id] = {
@@ -152,44 +145,37 @@ export default function PredictPage() {
         });
         return newInputs;
       });
-
-      if (sortedRounds.length > 0 && !activeTab) {
-        setActiveTab(sortedRounds[0].id);
-      }
-      setLoadingData(false);
     }
-  }, [activeTab]);
-
-  // FIXED: Refetch whenever the user logs in
-  useEffect(() => {
-    if (!authLoading) {
-      fetchRounds();
-      const interval = setInterval(fetchRounds, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [fetchRounds, authLoading, user]);
+  }, [myRounds, activeTab]);
 
   const savePrediction = async (matchId: string) => {
     const inp = inputs[matchId];
     if (!inp || inp.home === "" || inp.away === "") return;
 
     setSaving((s) => ({ ...s, [matchId]: true }));
-    const res = await fetch("/api/predictions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        matchId,
-        homeScore: Number(inp.home),
-        awayScore: Number(inp.away),
-      }),
-    });
-    setSaving((s) => ({ ...s, [matchId]: false }));
+    try {
+      const res = await fetch("/api/predictions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matchId,
+          homeScore: Number(inp.home),
+          awayScore: Number(inp.away),
+        }),
+      });
 
-    if (res.ok) {
-      fetchRounds();
-    } else {
-      const err = await res.json();
-      alert(err.error || "Failed to save prediction");
+      if (res.ok) {
+        // No manual fetch needed! Context onSnapshot will auto-update myRounds
+        // But we clear the saving state
+        setInputs(prev => ({ ...prev, [matchId]: { ...prev[matchId] } })); // force re-render if needed
+      } else {
+        const err = await res.json();
+        alert(err.error || "Failed to save prediction");
+      }
+    } catch (e) {
+      alert("Network error");
+    } finally {
+      setSaving((s) => ({ ...s, [matchId]: false }));
     }
   };
 
@@ -199,11 +185,11 @@ export default function PredictPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roundId, matchId }),
     });
-    if (res.ok) fetchRounds();
-    else alert("Failed to set double pick");
+    if (!res.ok) alert("Failed to set double pick");
+    // Auto-updates via Context listener
   };
 
-  if (authLoading || loadingData) {
+  if (authLoading || contextLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-24 flex flex-col items-center gap-4 text-white/50">
         <Loader2 className="w-10 h-10 animate-spin text-yellow-400" />
@@ -229,7 +215,7 @@ export default function PredictPage() {
     );
   }
 
-  const activeRound = rounds.find((r) => r.id === activeTab) || rounds[0];
+  const activeRound = myRounds?.find((r) => r.id === activeTab) || myRounds?.[0];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
@@ -247,9 +233,9 @@ export default function PredictPage() {
       </div>
 
       {/* Round Tabs */}
-      {rounds.length > 1 && (
+      {myRounds && myRounds.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-4 mb-4 sm:mb-6 scrollbar-hide">
-          {rounds.map((round) => {
+          {myRounds.map((round) => {
             const isActive = activeTab === round.id;
             const liveGlow = round.status === "LIVE" && !isActive;
             return (
@@ -317,8 +303,10 @@ export default function PredictPage() {
                   key={match.id}
                   className={`group relative rounded-2xl border transition-all duration-300 overflow-hidden ${
                     isLocked
-                      ? match.points && match.points > 0
+                      ? match.points !== null && match.points > 0
                         ? "bg-white/[0.03] border-yellow-400/10 hover:border-yellow-400/20"
+                        : match.points === 0
+                        ? "bg-white/[0.03] border-red-500/10 hover:border-red-500/20"
                         : "bg-white/[0.02] border-white/5 hover:border-white/10"
                       : "bg-white/[0.03] border-white/5 hover:border-white/15"
                   } ${isDoubled ? "ring-1 ring-yellow-400/20" : ""} ${match.isLive ? "ring-1 ring-red-500/20" : ""}`}
@@ -382,7 +370,7 @@ export default function PredictPage() {
                       <div className="flex items-center justify-center lg:justify-end gap-2 sm:gap-3">
                         {isLocked ? (
                           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-                            {pointsMeta && (
+                            {pointsMeta ? (
                               <div className={`px-3 sm:px-4 py-2 rounded-xl border ${pointsMeta.bg} ${pointsMeta.border} flex items-center gap-2`}>
                                 <Medal className={`w-4 h-4 ${pointsMeta.color}`} />
                                 <div>
@@ -390,17 +378,20 @@ export default function PredictPage() {
                                   <div className={`text-[10px] sm:text-xs ${pointsMeta.color} opacity-60`}>{match.points} pts</div>
                                 </div>
                               </div>
+                            ) : (
+                              hasPrediction && (
+                                <div className="px-3 sm:px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-white/30 text-xs sm:text-sm font-bold flex items-center gap-2">
+                                  <Clock className="w-4 h-4" /> Pending
+                                </div>
+                              )
                             )}
-                            {!pointsMeta && hasPrediction && (
-                              <div className="px-3 sm:px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-white/30 text-xs sm:text-sm font-bold flex items-center gap-2">
-                                <Clock className="w-4 h-4" /> Pending
-                              </div>
-                            )}
+                            
                             {!hasPrediction && (
                               <div className="px-3 sm:px-4 py-2 rounded-xl border border-red-500/10 bg-red-500/5 text-red-400/70 text-xs sm:text-sm font-bold flex items-center gap-2">
                                 <XCircle className="w-4 h-4" /> No Prediction
                               </div>
                             )}
+
                             {isDoubled && (
                               <div className="px-3 py-2 rounded-xl bg-yellow-400/10 border border-yellow-400/20 text-yellow-400">
                                 <Zap className="w-4 h-4 fill-yellow-400" />
@@ -411,24 +402,46 @@ export default function PredictPage() {
                           <>
                             <div className="flex items-center gap-2">
                               <div className="relative">
-                                <input type="number" min={0} value={inp.home} onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, home: e.target.value } })} placeholder="0" className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/20 transition" />
+                                <input 
+                                  type="number" 
+                                  min={0} 
+                                  value={inp.home} 
+                                  onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, home: e.target.value } })} 
+                                  placeholder="0" 
+                                  className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/20 transition" 
+                                />
                                 {hasPrediction && match.prediction?.homeScore === Number(inp.home) && inp.home !== "" && (
                                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0f172a]" />
                                 )}
                               </div>
                               <span className="text-white/20 font-bold">-</span>
                               <div className="relative">
-                                <input type="number" min={0} value={inp.away} onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, away: e.target.value } })} placeholder="0" className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/20 transition" />
+                                <input 
+                                  type="number" 
+                                  min={0} 
+                                  value={inp.away} 
+                                  onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, away: e.target.value } })} 
+                                  placeholder="0" 
+                                  className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/20 transition" 
+                                />
                                 {hasPrediction && match.prediction?.awayScore === Number(inp.away) && inp.away !== "" && (
                                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0f172a]" />
                                 )}
                               </div>
-                              <button onClick={() => savePrediction(match.id)} disabled={saving[match.id]} className="h-12 px-3 sm:px-4 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-500 transition disabled:opacity-50 flex items-center gap-1.5">
+                              <button 
+                                onClick={() => savePrediction(match.id)} 
+                                disabled={saving[match.id]} 
+                                className="h-12 px-3 sm:px-4 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-500 transition disabled:opacity-50 flex items-center gap-1.5"
+                              >
                                 {saving[match.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                 <span className="hidden sm:inline text-sm">Save</span>
                               </button>
                             </div>
-                            <button onClick={() => setDoublePick(activeRound.id, match.id)} className={`h-12 w-12 rounded-xl flex items-center justify-center transition border ${isDoubled ? "bg-yellow-400/20 border-yellow-400/40 text-yellow-400" : "bg-white/5 border-white/10 text-white/20 hover:text-white/60 hover:border-white/20"}`} title="Double points for this match">
+                            <button 
+                              onClick={() => setDoublePick(activeRound.id, match.id)} 
+                              className={`h-12 w-12 rounded-xl flex items-center justify-center transition border ${isDoubled ? "bg-yellow-400/20 border-yellow-400/40 text-yellow-400" : "bg-white/5 border-white/10 text-white/20 hover:text-white/60 hover:border-white/20"}`} 
+                              title="Double points for this match"
+                            >
                               <Star className={`w-5 h-5 ${isDoubled ? "fill-yellow-400" : ""}`} />
                             </button>
                           </>
