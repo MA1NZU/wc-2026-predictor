@@ -21,19 +21,13 @@ export async function GET() {
 
     // 2. Fetch User Predictions (Robustly)
     if (user && user.userId) {
-      let predSnap;
-      
-      // FIX: Try to find predictions using 'user_id' OR 'userId'
-      // We use a Promise race to find which one works or just check both logic
-      // But to be safe and simple, we filter in JS if the index fails, 
-      // though usually, standardizing on 'user_id' in the DB is best.
-      // Here, I will try 'user_id' first (standard Firebase convention for foreign keys).
-      
+      let predSnap: any = { empty: true, forEach: () => {} };
+
+      // Try 'user_id'
       try {
         predSnap = await db.collection("predictions").where("user_id", "==", user.userId).get();
       } catch (e) {
-        console.log(">>> [WARN] Index error or field missing for user_id");
-        predSnap = { empty: true, docs: [] } as any; // Fallback
+        console.log(">>> [WARN] Index error for user_id");
       }
 
       // If not found, try 'userId'
@@ -45,9 +39,10 @@ export async function GET() {
 
       if (!predSnap.empty) {
         console.log(`>>> [ROUNDS] Found ${predSnap.size} predictions`);
-        predSnap.forEach(doc => {
+        // FIX: Added ': any' to doc to satisfy TypeScript
+        predSnap.forEach((doc: any) => {
           const data = doc.data() as any;
-          // FIX: Match ID can be 'match_id' OR 'matchId'
+          // Match ID can be 'match_id' OR 'matchId'
           const matchKey = data.match_id || data.matchId; 
           if (matchKey) {
             predictionsMap.set(matchKey, { id: doc.id, ...data });
@@ -58,17 +53,19 @@ export async function GET() {
       }
 
       // Fetch Double Picks (Robustly)
-      let doubleSnap;
+      let doubleSnap: any = { empty: true, forEach: () => {} };
+      
       try {
         doubleSnap = await db.collection("double_picks").where("user_id", "==", user.userId).get();
-      } catch (e) { doubleSnap = { empty: true, docs: [] } as any; }
+      } catch (e) { /* ignore */ }
 
       if (doubleSnap.empty) {
          try { doubleSnap = await db.collection("double_picks").where("userId", "==", user.userId).get(); } catch (e) { /* */ }
       }
 
       if (!doubleSnap.empty) {
-        doubleSnap.forEach(doc => {
+        // FIX: Added ': any' to doc to satisfy TypeScript
+        doubleSnap.forEach((doc: any) => {
           const data = doc.data() as any;
           const matchKey = data.match_id || data.matchId;
           if (matchKey) doublePicksSet.add(matchKey);
