@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
 import { getCache, setCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
