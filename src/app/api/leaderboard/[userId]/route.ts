@@ -3,32 +3,23 @@ import { db } from "@/lib/firebase";
 
 export const dynamic = "force-dynamic";
 
-// Helper to calculate points
+// FIX: Returns null instead of 0 for unplayed matches
 function calculatePoints(
   pred: { home_score?: number; away_score?: number },
   match: { home_score?: number | null; away_score?: number | null }
 ) {
-  if (match.home_score == null || match.away_score == null) return 0;
-  if (pred.home_score == null || pred.away_score == null) return 0;
+  if (match.home_score == null || match.away_score == null) return null;
+  if (pred.home_score == null || pred.away_score == null) return null;
 
   if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
   const predOutcome =
-    pred.home_score > pred.away_score
-      ? "home"
-      : pred.home_score < pred.away_score
-      ? "away"
-      : "draw";
-
+    pred.home_score > pred.away_score ? "home" : pred.home_score < pred.away_score ? "away" : "draw";
   const actOutcome =
-    match.home_score > match.away_score
-      ? "home"
-      : match.home_score < match.away_score
-      ? "away"
-      : "draw";
+    match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
 
   if (predOutcome === actOutcome) return 3;
-  return 0;
+  return 0; // Only returns 0 for actual wrong predictions
 }
 
 export async function GET(
@@ -39,27 +30,20 @@ export async function GET(
     const { userId } = await Promise.resolve(params);
     if (!userId) return NextResponse.json({ error: "User ID missing" }, { status: 400 });
 
-    // 1. Fetch User
     const userSnap = await db.collection("users").doc(userId).get();
     if (!userSnap.exists) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const userData = userSnap.data() || {};
     const user = { id: userSnap.id, ...userData } as any;
 
-    // 2. Fetch Predictions
+    // Fetch with flexible field names
     let predSnap = await db.collection("predictions").where("user_id", "==", userId).get();
-    if (predSnap.empty) {
-      predSnap = await db.collection("predictions").where("userId", "==", userId).get();
-    }
+    if (predSnap.empty) predSnap = await db.collection("predictions").where("userId", "==", userId).get();
 
-    // 3. Fetch Matches
     const matchSnap = await db.collection("matches").get();
 
-    // 4. Fetch Double Picks
     let doubleSnap = await db.collection("double_picks").where("user_id", "==", userId).get();
-    if (doubleSnap.empty) {
-      doubleSnap = await db.collection("double_picks").where("userId", "==", userId).get();
-    }
+    if (doubleSnap.empty) doubleSnap = await db.collection("double_picks").where("userId", "==", userId).get();
 
     const matchesMap = new Map<string, any>();
     matchSnap.docs.forEach((doc) => {
@@ -85,7 +69,9 @@ export async function GET(
 
         const base = calculatePoints(pred, match);
         const isDoubled = doubleSet.has(matchKey);
-        const points = base * (isDoubled ? 2 : 1);
+        
+        // FIX: If base is null (pending), points stays null
+        const points = base === null ? null : base * (isDoubled ? 2 : 1);
 
         return {
           id: pred.id,
@@ -95,29 +81,26 @@ export async function GET(
           matchDate: match.match_date || match.matchDate || new Date().toISOString(),
           homeScore: match.home_score ?? null,
           awayScore: match.away_score ?? null,
+          isLive: match.is_live ?? false,
           predictedHome: pred.home_score ?? pred.homeScore,
           predictedAway: pred.away_score ?? pred.awayScore,
           isDoubled,
           basePoints: base,
-          points,
+          points, // Now correctly null for pending
           hasScore: match.home_score != null && match.away_score != null,
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
 
-    // FIX: Sort by date
-    predictionsDetail.sort(
-      (a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
-    );
+    predictionsDetail.sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
 
-    // FIX: Sum points only for matches that have scores
+    // FIX: Sum only valid points (ignore nulls)
     let totalPoints = 0;
     predictionsDetail.forEach((p) => {
-      // Only add points if the match actually has a score
-      if (p.hasScore) {
-         totalPoints += p.points || 0;
-      }
+      if (p.points !== null) totalPoints += p.points;
     });
+    // Add bonus points if they exist
+    totalPoints += user.bonusPoints || 0;
 
     return NextResponse.json({
       user: { id: user.id, username: user.username },
@@ -126,7 +109,7 @@ export async function GET(
       predictions: predictionsDetail,
     });
   } catch (error) {
-    console.error(">>> [LEADERBOARD ERROR]", error);
+    console.error(">>> [PLAYER DETAILS ERROR]", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
