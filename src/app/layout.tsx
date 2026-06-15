@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+
+// 1. Import the new Context
+import { GameProvider } from "@/context/GameContext"; 
+
 import { Header } from "@/components/Header";
 import { AuthProvider } from "@/components/AuthProvider";
 
@@ -24,10 +28,13 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <Header />
-          <main className="min-h-screen bg-gradient-to-b from-wc-dark via-[#0f172a] to-wc-dark">
-            {children}
-          </main>
+          {/* 2. Wrap the app in GameProvider so all pages share real-time data */}
+          <GameProvider>
+            <Header />
+            <main className="min-h-screen bg-gradient-to-b from-wc-dark via-[#0f172a] to-wc-dark">
+              {children}
+            </main>
+          </GameProvider>
         </AuthProvider>
       </body>
     </html>
