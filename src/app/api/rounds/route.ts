@@ -69,19 +69,20 @@ export async function GET() {
           const pred = predictionsMap.get(match.id) || null;
           const double = doublePicksSet.has(match.id);
 
-          return {
+                    return {
             id: match.id,
-            homeTeam: match.home_team,
-            awayTeam: match.away_team,
-            matchDate: match.match_date,
-            homeScore: match.home_score ?? null,
-            awayScore: match.away_score ?? null,
-            isLive: match.is_live ?? false,
+            // FIX: Safely fallback if field name differs or is missing
+            homeTeam: match.home_team || match.homeTeam || "TBD",
+            awayTeam: match.away_team || match.awayTeam || "TBD",
+            matchDate: match.match_date || match.matchDate || new Date().toISOString(),
+            homeScore: match.home_score ?? match.homeScore ?? null,
+            awayScore: match.away_score ?? match.awayScore ?? null,
+            isLive: match.is_live ?? match.isLive ?? false,
             prediction: pred
               ? { homeScore: pred.home_score, awayScore: pred.away_score }
               : null,
             doublePick: double,
-            points: null, // Calculated on frontend or leaderboard
+            points: null,
           };
         }),
       };
