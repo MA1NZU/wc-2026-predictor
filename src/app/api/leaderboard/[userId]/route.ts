@@ -32,17 +32,19 @@ function calculatePoints(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: { userId: string } | Promise<{ userId: string }> }
 ) {
   try {
-    const { userId } = await params; // Await params in Next.js App Router
+    // Robustly handle params (works for both Next.js 13 object and Next.js 14+ Promise)
+    const { userId } = await Promise.resolve(params);
 
     // 1. Fetch User
     const userSnap = await db.collection("users").doc(userId).get();
     if (!userSnap.exists) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-    const user = { id: userSnap.id, ...userSnap.data() } as any;
+    const userData = userSnap.data() || {};
+    const user = { id: userSnap.id, ...userData } as any;
 
     // 2. Fetch Predictions
     const predSnap = await db
@@ -62,18 +64,25 @@ export async function GET(
     // Prepare Maps
     const matchesMap = new Map<string, any>();
     matchSnap.docs.forEach((doc) => {
-      matchesMap.set(doc.id, { id: doc.id, ...doc.data() });
+      const data = doc.data() || {};
+      matchesMap.set(doc.id, { id: doc.id, ...data } as any);
     });
 
     const doubleSet = new Set<string>();
     doubleSnap.docs.forEach((doc) => {
-      doubleSet.add(doc.data().match_id);
+      const data = doc.data();
+      if (data && data.match_id) {
+        doubleSet.add(data.match_id);
+      }
     });
 
     // Map and calculate points
     const predictionsDetail = predSnap.docs
       .map((predDoc) => {
-        const pred = { id: predDoc.id, ...predDoc.data() };
+        // FIX: Explicitly cast to 'any' to resolve the 'match_id' property error
+        const data = predDoc.data() || {};
+        const pred = { id: predDoc.id, ...data } as any;
+        
         const match = matchesMap.get(pred.match_id);
         
         if (!match) return null;
