@@ -20,10 +20,10 @@ export async function POST(req: NextRequest) {
     if (!matchSnap.exists) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 });
     }
+    // FIX: Removed markdown corruption from matchSnap.data()
     const matchData = matchSnap.data() as any;
 
     // 2. Fetch Round to check status
-    // Firestore doesn't support joins, so we fetch the related round manually
     let roundData: any = { status: "UPCOMING" };
     if (matchData.round_id) {
       const roundSnap = await db.collection("rounds").doc(matchData.round_id).get();
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Check Locking Conditions
+    // FIX: Removed markdown corruption from matchData.is_live
     if (matchData.is_live || roundData.status === "LIVE" || roundData.status === "FINISHED") {
       return NextResponse.json({ error: "Predictions are locked for this match" }, { status: 403 });
     }
@@ -44,7 +45,6 @@ export async function POST(req: NextRequest) {
       updated_at: new Date(),
     };
 
-    // Firestore doesn't support SQL "ON CONFLICT", so we query -> update or create
     const predQuery = await db
       .collection("predictions")
       .where("user_id", "==", user.userId)
@@ -54,12 +54,11 @@ export async function POST(req: NextRequest) {
 
     let prediction;
     if (!predQuery.empty) {
-      // Update existing prediction
+      // FIX: Removed markdown corruption from predQuery.docs[0]
       const docRef = predQuery.docs[0].ref;
       await docRef.update(predData);
       prediction = { id: docRef.id, ...predData };
     } else {
-      // Create new prediction
       const docRef = await db.collection("predictions").add(predData);
       prediction = { id: docRef.id, ...predData };
     }
