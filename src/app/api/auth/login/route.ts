@@ -12,48 +12,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    // 1. Firebase Admin Query
-    const snapshot = await db
-      .collection("users")
-      .where("email", "==", email)
-      .limit(1)
-      .get();
+    // 1. Find User
+    const snapshot = await db.collection("users").where("email", "==", email).limit(1).get();
 
     if (snapshot.empty) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    // 2. Extract User
     const docSnap = snapshot.docs[0];
-    const user = { id: docSnap.id, ...docSnap.data() } as any;
+    // FIX: Get data as 'any' to handle dynamic fields
+    const user = docSnap.data() as any;
 
-    // 3. Check Password
-    // Ensure 'password' exists in your Firestore document
+    // 2. Check Password
     const valid = await comparePassword(password, user.password);
-
     if (!valid) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    // 4. Sign Token
-    const adminStatus = user.is_admin || user.isAdmin || false; 
-    const token = await signToken(user.id, user.email, adminStatus);
+    // 3. FIX: Check for BOTH field names to determine Admin status
+    // This fixes the issue where you are Admin in DB but Regular User in App
+    const isAdmin = user.is_admin === true || user.isAdmin === true;
 
-    // 5. Set Cookie & Return Response
+    console.log(`>>> [LOGIN] User: ${email} | Admin Status Found: ${isAdmin} | Field in DB:`, user.is_admin !== undefined ? 'is_admin' : (user.isAdmin !== undefined ? 'isAdmin' : 'MISSING'));
+
+    // 4. Sign Token with CORRECT admin status
+    const token = await signToken(docSnap.id, user.email, isAdmin);
+
     const response = NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        isAdmin: user.is_admin,
-      },
+      user: { id: docSnap.id, email: user.email, username: user.username, isAdmin },
     });
 
     response.cookies.set("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
       path: "/",
     });
 
