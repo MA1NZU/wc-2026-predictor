@@ -4,6 +4,36 @@ import { getUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+// Helper to calculate points (Must be in this file now)
+function calculatePoints(
+  pred: { home_score?: number; away_score?: number },
+  match: { home_score?: number | null; away_score?: number | null }
+) {
+  if (match.home_score == null || match.away_score == null) return 0;
+  if (pred.home_score == null || pred.away_score == null) return 0;
+
+  // Exact score match = 6 pts
+  if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
+
+  const predOutcome =
+    pred.home_score > pred.away_score
+      ? "home"
+      : pred.home_score < pred.away_score
+      ? "away"
+      : "draw";
+
+  const actOutcome =
+    match.home_score > match.away_score
+      ? "home"
+      : match.home_score < match.away_score
+      ? "away"
+      : "draw";
+
+  // Correct winner/draw = 3 pts
+  if (predOutcome === actOutcome) return 3;
+  return 0;
+}
+
 export async function GET() {
   try {
     const user = await getUser();
@@ -16,55 +46,34 @@ export async function GET() {
     const roundsData = roundsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     const matchesData = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+    // 2. Fetch Predictions
     let predictionsMap = new Map<string, any>();
     let doublePicksSet = new Set<string>();
 
-    // 2. Fetch User Predictions (Robustly)
     if (user && user.userId) {
-      let predSnap: any = { empty: true, forEach: () => {} };
-
-      // Try 'user_id'
-      try {
-        predSnap = await db.collection("predictions").where("user_id", "==", user.userId).get();
-      } catch (e) {
-        console.log(">>> [WARN] Index error for user_id");
-      }
-
-      // If not found, try 'userId'
+      // Try 'user_id' then 'userId'
+      let predSnap = await db.collection("predictions").where("user_id", "==", user.userId).get();
       if (predSnap.empty) {
-         try {
-           predSnap = await db.collection("predictions").where("userId", "==", user.userId).get();
-         } catch (e) { /* ignore */ }
+        predSnap = await db.collection("predictions").where("userId", "==", user.userId).get();
       }
 
       if (!predSnap.empty) {
-        console.log(`>>> [ROUNDS] Found ${predSnap.size} predictions`);
-        // FIX: Added ': any' to doc to satisfy TypeScript
         predSnap.forEach((doc: any) => {
           const data = doc.data() as any;
-          // Match ID can be 'match_id' OR 'matchId'
-          const matchKey = data.match_id || data.matchId; 
+          const matchKey = data.match_id || data.matchId;
           if (matchKey) {
             predictionsMap.set(matchKey, { id: doc.id, ...data });
           }
         });
-      } else {
-        console.log(">>> [ROUNDS] No predictions found. Check DB field names!");
       }
 
-      // Fetch Double Picks (Robustly)
-      let doubleSnap: any = { empty: true, forEach: () => {} };
-      
-      try {
-        doubleSnap = await db.collection("double_picks").where("user_id", "==", user.userId).get();
-      } catch (e) { /* ignore */ }
-
+      // Fetch Double Picks
+      let doubleSnap = await db.collection("double_picks").where("user_id", "==", user.userId).get();
       if (doubleSnap.empty) {
-         try { doubleSnap = await db.collection("double_picks").where("userId", "==", user.userId).get(); } catch (e) { /* */ }
+        doubleSnap = await db.collection("double_picks").where("userId", "==", user.userId).get();
       }
 
       if (!doubleSnap.empty) {
-        // FIX: Added ': any' to doc to satisfy TypeScript
         doubleSnap.forEach((doc: any) => {
           const data = doc.data() as any;
           const matchKey = data.match_id || data.matchId;
@@ -73,7 +82,7 @@ export async function GET() {
       }
     }
 
-    // 3. Merge Data
+    // 3. Merge Data & Calculate Points
     const rounds = roundsData.map((round: any) => {
       const roundMatches = matchesData.filter((m: any) => 
         (m.round_id || m.roundId) === round.id
@@ -88,6 +97,13 @@ export async function GET() {
           const pred = predictionsMap.get(match.id) || null;
           const isDoubled = doublePicksSet.has(match.id);
 
+          // FIX: Calculate points NOW instead of returning null
+          let points = null;
+          if (pred && match.home_score !== null && match.away_score !== null) {
+             points = calculatePoints(pred, match);
+             if (isDoubled) points *= 2;
+          }
+
           return {
             id: match.id,
             homeTeam: match.home_team || match.homeTeam || "TBD",
@@ -101,7 +117,7 @@ export async function GET() {
                awayScore: pred.away_score ?? pred.awayScore 
             } : null,
             doublePick: isDoubled,
-            points: null,
+            points: points, // This is what makes the "Perfect/Outcome" badges appear!
           };
         }),
       };
