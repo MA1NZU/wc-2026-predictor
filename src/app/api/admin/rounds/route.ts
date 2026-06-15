@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
 import { getUser } from "@/lib/auth";
 import { getCache, setCache, clearCache } from "@/lib/cache";
 
