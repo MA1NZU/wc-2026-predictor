@@ -72,7 +72,7 @@ export async function GET() {
       const userId = user.id;
       
       let totalPoints = 0;
-      let predictionCount = 0;
+      let predictionsCount = 0; // FIX: Renamed to plural
 
       const userPreds = userPredictionsMap.get(userId) || [];
       const userDoubles = userDoublesMap.get(userId) || new Set();
@@ -83,7 +83,7 @@ export async function GET() {
         const match = matchesMap.get(matchId);
 
         if (match) {
-          predictionCount++;
+          predictionsCount++; // FIX: Increment plural variable
           const base = calculatePoints(pred, match);
           const isDoubled = userDoubles.has(matchId);
           totalPoints += base * (isDoubled ? 2 : 1);
@@ -94,7 +94,7 @@ export async function GET() {
         id: user.id,
         username: user.username,
         totalPoints,
-        predictionsCount,
+        predictionsCount, // FIX: Return plural variable
       };
     });
 
