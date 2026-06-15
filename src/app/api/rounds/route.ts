@@ -10,72 +10,89 @@ function calculatePoints(
   match: { home_score: number | null; away_score: number | null }
 ) {
   if (match.home_score === null || match.away_score === null) return null;
+
   if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
-  const predOutcome = pred.home_score > pred.away_score ? "home" : pred.home_score < pred.away_score ? "away" : "draw";
-  const actOutcome = match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
+  const predOutcome =
+    pred.home_score > pred.away_score
+      ? "home"
+      : pred.home_score < pred.away_score
+      ? "away"
+      : "draw";
+
+  const actOutcome =
+    match.home_score > match.away_score
+      ? "home"
+      : match.home_score < match.away_score
+      ? "away"
+      : "draw";
 
   if (predOutcome === actOutcome) return 3;
+
   return 0;
 }
 
 export async function GET() {
   try {
     const user = await getUser();
-
     const cacheKey = `rounds-data-${Math.floor(Date.now() / 60_000)}`;
     let cachedData = getCache<any>(cacheKey, 60_000);
 
-    let roundsData, matchesData;
+    let roundsData: any[] = [];
+    let matchesData: any[] = [];
+
     if (cachedData) {
       roundsData = cachedData.rounds;
       matchesData = cachedData.matches;
     } else {
-      const { data: rounds } = await supabase
-        .from("rounds")
-        .select("*")
-        .order("order_num", { ascending: true });
+      // Firebase Admin Queries for Rounds and Matches
+      const roundsSnap = await db.collection("rounds").orderBy("order_num", "asc").get();
+      const matchesSnap = await db.collection("matches").orderBy("order_num", "asc").get();
 
-      const { data: matches } = await supabase
-        .from("matches")
-        .select("*")
-        .order("order_num", { ascending: true });
-
-      roundsData = rounds || [];
-      matchesData = matches || [];
+      roundsData = roundsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      matchesData = matchesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       setCache(cacheKey, { rounds: roundsData, matches: matchesData }, 60_000);
     }
 
     const matchesMap = new Map<string, any>();
-    matchesData.forEach((m: any) => matchesMap.set(m.id, m));
+    matchesData.forEach((m) => matchesMap.set(m.id, m));
 
     let predictionsMap = new Map<string, any>();
     let doublePicksSet = new Set<string>();
 
     if (user) {
-      const { data: predictions } = await supabase
-        .from("predictions")
-        .select("*")
-        .eq("user_id", user.userId);
+      // Firebase Admin Queries for User Data
+      const predSnap = await db
+        .collection("predictions")
+        .where("user_id", "==", user.userId)
+        .get();
 
-      const { data: doublePicks } = await supabase
-        .from("double_picks")
-        .select("*")
-        .eq("user_id", user.userId);
+      const doubleSnap = await db
+        .collection("double_picks")
+        .where("user_id", "==", user.userId)
+        .get();
 
-      (predictions || []).forEach((p: any) => predictionsMap.set(p.match_id, p));
-      (doublePicks || []).forEach((d: any) => doublePicksSet.add(d.match_id));
+      predSnap.forEach((doc) => {
+        const data = doc.data() as any;
+        predictionsMap.set(data.match_id, { id: doc.id, ...data });
+      });
+
+      doubleSnap.forEach((doc) => {
+        const data = doc.data() as any;
+        doublePicksSet.add(data.match_id);
+      });
     }
 
+    // Process Rounds and Matches
     const rounds = roundsData.map((round: any) => {
-      const roundMatches = matchesData.filter((m: any) => m.round_id === round.id);
+      const roundMatches = matchesData.filter((m) => m.round_id === round.id || m.round_id === round.round_id);
 
       return {
         id: round.id,
         name: round.name,
         status: round.status,
-        order: round.order_num || 0,
+        order: round.order_num || round.order || 0,
         matches: roundMatches.map((match: any) => {
           const pred = predictionsMap.get(match.id) || null;
           const double = doublePicksSet.has(match.id);
@@ -89,7 +106,7 @@ export async function GET() {
             matchDate: match.match_date,
             homeScore: match.home_score ?? null,
             awayScore: match.away_score ?? null,
-            isLive: match.is_live ?? false,
+            isLive: match.is_live ?? false, // Fixed corrupted variable name
             prediction: pred
               ? { homeScore: pred.home_score, awayScore: pred.away_score }
               : null,
