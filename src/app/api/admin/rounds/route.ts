@@ -5,12 +5,27 @@ import { getCache, setCache, clearCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
+// Helper to verify Admin access
+async function verifyAdmin() {
+  const user = await getUser();
+  
+  // Debug log to help you see why it might fail
+  console.log(">>> [ADMIN CHECK] User Payload:", user);
+
+  // Check for both possible field names (isAdmin vs is_admin)
+  const isAdmin = user?.isAdmin === true || (user as any)?.is_admin === true;
+
+  if (!isAdmin) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+  
+  return { user };
+}
+
 export async function GET() {
   try {
-    const user = await getUser();
-    if (!user?.isAdmin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const check = await verifyAdmin();
+    if (check.error) return check.error;
 
     const cacheKey = `admin-rounds-${Math.floor(Date.now() / 60_000)}`;
     const cached = getCache<any>(cacheKey, 60_000);
@@ -19,7 +34,6 @@ export async function GET() {
 
     // Fetch rounds
     const roundsSnap = await db.collection("rounds").orderBy("order", "asc").get();
-
     // Fetch matches
     const matchesSnap = await db.collection("matches").orderBy("order", "asc").get();
 
@@ -27,8 +41,6 @@ export async function GET() {
     const matchesMap = new Map<string, any[]>();
     matchesSnap.forEach((matchDoc) => {
       const data = matchDoc.data();
-      // Note: Use 'round_id' or 'roundId' depending on your schema. 
-      // The code below checks both for safety.
       const roundId = data.round_id || data.roundId; 
       if (roundId) {
         if (!matchesMap.has(roundId)) matchesMap.set(roundId, []);
@@ -53,14 +65,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getUser();
-    if (!user?.isAdmin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const check = await verifyAdmin();
+    if (check.error) return check.error;
 
     const { name, status, order } = await req.json();
 
-    // firebase-admin supports .add() which returns the reference with the ID
     const docRef = await db.collection("rounds").add({
       name,
       status: status || "UPCOMING",
@@ -70,7 +79,6 @@ export async function POST(req: NextRequest) {
 
     clearCache();
 
-    // Construct the response object
     const newRound = {
       id: docRef.id,
       name,
@@ -87,10 +95,8 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const user = await getUser();
-    if (!user?.isAdmin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const check = await verifyAdmin();
+    if (check.error) return check.error;
 
     const { id, status, name, order } = await req.json();
 
@@ -105,7 +111,6 @@ export async function PATCH(req: NextRequest) {
 
     clearCache();
 
-    // Fetch updated doc to return
     const docSnap = await roundRef.get();
     return NextResponse.json({ round: { id: docSnap.id, ...docSnap.data() } });
   } catch (error) {
@@ -116,10 +121,8 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const user = await getUser();
-    if (!user?.isAdmin) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const check = await verifyAdmin();
+    if (check.error) return check.error;
 
     const { id } = await req.json();
 
