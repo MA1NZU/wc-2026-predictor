@@ -1,15 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useGameContext } from "@/context/GameContext"; // Import shared context
 import { Trophy, Medal, Loader2, Crown, X, Swords, Zap, Star } from "lucide-react";
 
-type LeaderboardUser = {
-  id: string;
-  username: string;
-  totalPoints: number;
-  predictionsCount: number;
-};
-
+// --- Types ---
 type PredictionDetail = {
   id: string;
   matchId: string;
@@ -30,25 +25,33 @@ type PredictionDetail = {
 type UserDetail = {
   user: { id: string; username: string };
   totalPoints: number;
-  predictionsCount: number;
+  predictionsCount: number; // Kept for API response compatibility, even if not displayed
   predictions: PredictionDetail[];
 };
 
+// --- Helpers ---
 function getFlag(team: string) {
+  if (!team) return "🏳️";
   const flags: Record<string, string> = {
-    FRANCE: "🇫🇷", GERMANY: "🇩🇪", ENGLAND: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SPAIN: "🇪🇸", PORTUGAL: "🇵🇹",
+     FRANCE: "🇫🇷", GERMANY: "🇩🇪", ENGLAND: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SPAIN: "🇪🇸", PORTUGAL: "🇵🇹",
     NETHERLANDS: "🇳🇱", BELGIUM: "🇧🇪", ITALY: "🇮🇹", CROATIA: "🇭🇷", DENMARK: "🇩🇰",
     SWITZERLAND: "🇨🇭", POLAND: "🇵🇱", WALES: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", SCOTLAND: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", UKRAINE: "🇺🇦",
     AUSTRIA: "🇦🇹", SERBIA: "🇷🇸", SWEDEN: "🇸🇪", NORWAY: "🇳🇴", CZECHIA: "🇨🇿",
     CZECH: "🇨🇿", HUNGARY: "🇭🇺", ROMANIA: "🇷🇴", SLOVAKIA: "🇸🇰", SLOVENIA: "🇸🇮",
     GREECE: "🇬🇷", TURKEY: "🇹🇷", IRELAND: "🇮🇪", NORTHERN: "🇬🇧", BOSNIA: "🇧🇦",
     FINLAND: "🇫🇮", RUSSIA: "🇷🇺", "SOUTH AFRICA": "🇿🇦", "TURKIYE": "🇹🇷", "SOUTH KOREA": "🇰🇷", "IVORY COAST": "🇨🇮", "CAPE VERDE": "🇨🇻", "SAUDI ARABIA": "🇸🇦", "DR CONGO": "🇨🇬",
+
+    /* ---------- CONMEBOL (6) ---------- */
     ARGENTINA: "🇦🇷", BRAZIL: "🇧🇷", URUGUAY: "🇺🇾", COLOMBIA: "🇨🇴", ECUADOR: "🇪🇨",
-    CHILE: "🇨🇱", PERU: "🇵🇪", PARAGUAY: "🇵🇾", BOLIVIA: "🇧🇴", VENEZUELA: "🇻🇪",
+    CHILE: "🇨🇱", PERU: "🇵🇪", PARAGUAY: "🇵🇾", BOLIVIA: "🇧🇴", VENEZUELA: "🇻🇪", 
+
+    /* ---------- CONCACAF (9 incl. 3 hosts) ---------- */
     USA: "🇺🇸", CANADA: "🇨🇦", MEXICO: "🇲🇽", PANAMA: "🇵🇦", COSTA: "🇨🇷",
     RICA: "🇨🇷", HONDURAS: "🇭🇳", JAMAICA: "🇯🇲", EL: "🇸🇻", SALVADOR: "🇸🇻",
     GUATEMALA: "🇬🇹", HAITI: "🇭🇹", TRINIDAD: "🇹🇹", CUBA: "🇨🇺", CURACAO: "🇨🇼",
     NICARAGUA: "🇳🇮", BERMUDA: "🇧🇲",
+
+    /* ---------- CAF (9) ---------- */
     MOROCCO: "🇲🇦", EGYPT: "🇪🇬", SENEGAL: "🇸🇳", TUNISIA: "🇹🇳", ALGERIA: "🇩🇿",
     NIGERIA: "🇳🇬", CAMEROON: "🇨🇲", GHANA: "🇬🇭", IVORY: "🇨🇮", COTE: "🇨🇮",
     "CÔTE D'IVOIRE": "🇨🇮", MALI: "🇲🇱", BURKINA: "🇧🇫", SOUTH: "🇿🇦", KENYA: "🇰🇪",
@@ -60,6 +63,8 @@ function getFlag(team: string) {
     CHAD: "🇹🇩", ERITREA: "🇪🇷", DJIBOUTI: "🇩🇯", CENTRAL: "🇨🇫", EQUATORIAL: "🇬🇶",
     SAO: "🇸🇹", CAPE: "🇨🇻", SEYCHELLES: "🇸🇨", MAURITIUS: "🇲🇺", BURUNDI: "🇧🇮",
     SOMALIA: "🇸🇴", SOUTHSUDAN: "🇸🇸", "SOUTH SUDAN": "🇸🇸",
+
+    /* ---------- AFC (8) ---------- */
     JAPAN: "🇯🇵", KOREA: "🇰🇷", AUSTRALIA: "🇦🇺", IRAN: "🇮🇷", SAUDI: "🇸🇦",
     ARABIA: "🇸🇦", QATAR: "🇶🇦", IRAQ: "🇮🇶", UZBEKISTAN: "🇺🇿", JORDAN: "🇯🇴",
     UAE: "🇦🇪", BAHRAIN: "🇧🇭", CHINA: "🇨🇳", THAILAND: "🇹🇭", INDONESIA: "🇮🇩",
@@ -70,6 +75,8 @@ function getFlag(team: string) {
     PAKISTAN: "🇵🇰", SRI: "🇱🇰", BHUTAN: "🇧🇹", MALDIVES: "🇲🇻", GUAM: "🇬🇺",
     CAMBODIA: "🇰🇭", LAOS: "🇱🇦", MYANMAR: "🇲🇲", BRUNEI: "🇧🇳", PHILIPPINES: "🇵🇭",
     NORTH: "🇰🇵",
+
+    /* ---------- OFC (1) ---------- */
     "NEW ZEALAND": "🇳🇿", FIJI: "🇫🇯", PAPUA: "🇵🇬", NEWCALEDONIA: "🇳🇨", TAHITI: "🇵🇫",
     SAMOA: "🇼🇸", VANUATU: "🇻🇺", SOLOMON: "🇸🇧",
   };
@@ -78,18 +85,16 @@ function getFlag(team: string) {
 }
 
 function formatDate(dateStr: string) {
+  if (!dateStr) return "Date TBD";
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+    weekday: "short", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
   });
 }
 
 function getPointsLabel(points: number | null, isDoubled: boolean) {
-  if (points === null) return null;
+  if (points === null) return null; // Pending
   if (points === 0) return { text: "Miss", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
   if (isDoubled) {
     if (points === 12) return { text: "Perfect 2x", color: "text-wc-gold", bg: "bg-wc-gold/20", border: "border-wc-gold/30" };
@@ -101,36 +106,30 @@ function getPointsLabel(points: number | null, isDoubled: boolean) {
 }
 
 export default function LeaderboardPage() {
-  const [users, setUsers] = useState<LeaderboardUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  // FIX: Use Context for real-time leaderboard data instead of polling
+  const { leaderboard, loading: loadingContext } = useGameContext();
+  
+  // Local state only for the modal details
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      const res = await fetch("/api/leaderboard", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.leaderboard);
-      }
-      setLoading(false);
-    };
-    fetchLeaderboard();
-    const interval = setInterval(fetchLeaderboard, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
   const openUserDetail = async (userId: string) => {
     setLoadingDetail(true);
-    const res = await fetch(`/api/leaderboard/${userId}`, { cache: "no-store" });
-    if (res.ok) {
-      const data = await res.json();
-      setSelectedUser(data);
+    setSelectedUser(null); // Reset previous
+    try {
+      const res = await fetch(`/api/leaderboard/${userId}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedUser(data);
+      }
+    } catch (error) {
+      console.error("Failed to load user details", error);
+    } finally {
+      setLoadingDetail(false);
     }
-    setLoadingDetail(false);
   };
 
-  if (loading) {
+  if (loadingContext) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-24 flex flex-col items-center gap-4 text-white/50">
         <Loader2 className="w-10 h-10 animate-spin text-wc-gold" />
@@ -154,8 +153,9 @@ export default function LeaderboardPage() {
           <div>Player</div>
           <div className="text-right">Points</div>
         </div>
+
         <div className="divide-y divide-white/5">
-          {users.map((user, index) => (
+          {leaderboard?.map((user: any, index: number) => (
             <div
               key={user.id}
               className={`grid grid-cols-[auto_1fr_auto] gap-4 px-6 py-4 items-center transition ${
@@ -180,16 +180,14 @@ export default function LeaderboardPage() {
                 >
                   {user.username}
                 </button>
-                {index === 0 && (
-                  <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-wc-gold/20 text-wc-gold uppercase tracking-wider">#1</span>
-                )}
+                {/* Removed predictionsCount as requested */}
               </div>
               <div className="text-right font-bold text-lg text-wc-gold">
                 {user.totalPoints}
               </div>
             </div>
           ))}
-          {users.length === 0 && (
+          {(!leaderboard || leaderboard.length === 0) && (
             <div className="px-6 py-12 text-center text-white/30">
               No players yet. Be the first to predict!
             </div>
@@ -215,8 +213,9 @@ export default function LeaderboardPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold">{selectedUser.user.username}</h2>
+                  {/* Removed predictionsCount here too */}
                   <p className="text-xs text-white/40">
-                    {selectedUser.predictionsCount} predictions • {selectedUser.totalPoints} pts
+                    {selectedUser.totalPoints} pts
                   </p>
                 </div>
               </div>
@@ -239,6 +238,7 @@ export default function LeaderboardPage() {
               ) : (
                 selectedUser.predictions.map((pred) => {
                   const pointsMeta = getPointsLabel(pred.points, pred.isDoubled);
+                  
                   return (
                     <div
                       key={pred.id}
@@ -312,7 +312,6 @@ export default function LeaderboardPage() {
                               </div>
                             </div>
                           )}
-
                           {pointsMeta && (
                             <div className={`px-3 py-1.5 rounded-lg border ${pointsMeta.bg} ${pointsMeta.border} text-xs font-bold ${pointsMeta.color} flex items-center gap-1`}>
                               <Star className="w-3 h-3 fill-current" />
