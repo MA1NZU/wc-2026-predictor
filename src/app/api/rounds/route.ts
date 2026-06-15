@@ -7,55 +7,79 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const user = await getUser();
-    console.log(`>>> [API] Fetching rounds for User: ${user?.userId || "Guest"}`);
+    console.log(`>>> [ROUNDS] Fetching data for: ${user?.userId || "Guest"}`);
 
     // 1. Fetch Rounds & Matches
     const roundsSnap = await db.collection("rounds").orderBy("order", "asc").get();
     const matchesSnap = await db.collection("matches").orderBy("order", "asc").get();
 
-    // FIX: Explicitly type as any[] so TypeScript allows accessing dynamic fields
-    const roundsData: any[] = roundsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const matchesData: any[] = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const roundsData = roundsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const matchesData = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     let predictionsMap = new Map<string, any>();
     let doublePicksSet = new Set<string>();
 
-    // 2. Fetch User Predictions
+    // 2. Fetch User Predictions (Robustly)
     if (user && user.userId) {
-      console.log(`>>> [DB] Querying predictions where user_id == "${user.userId}"`);
+      let predSnap;
       
-      const predSnap = await db
-        .collection("predictions")
-        .where("user_id", "==", user.userId)
-        .get();
-
-      if (predSnap.empty) {
-        console.log(`>>> [DB] No predictions found for this user.`);
+      // FIX: Try to find predictions using 'user_id' OR 'userId'
+      // We use a Promise race to find which one works or just check both logic
+      // But to be safe and simple, we filter in JS if the index fails, 
+      // though usually, standardizing on 'user_id' in the DB is best.
+      // Here, I will try 'user_id' first (standard Firebase convention for foreign keys).
+      
+      try {
+        predSnap = await db.collection("predictions").where("user_id", "==", user.userId).get();
+      } catch (e) {
+        console.log(">>> [WARN] Index error or field missing for user_id");
+        predSnap = { empty: true, docs: [] } as any; // Fallback
       }
 
-      predSnap.forEach(doc => {
-        const data = doc.data() as any;
-        // Handle both snake_case and camelCase field names
-        const matchKey = data.match_id || data.matchId || data.matchID;
-        if (matchKey) {
-          predictionsMap.set(matchKey, { id: doc.id, ...data });
-        }
-      });
+      // If not found, try 'userId'
+      if (predSnap.empty) {
+         try {
+           predSnap = await db.collection("predictions").where("userId", "==", user.userId).get();
+         } catch (e) { /* ignore */ }
+      }
 
-      // Fetch Double Picks
-      const doubleSnap = await db.collection("double_picks").where("user_id", "==", user.userId).get();
-      doubleSnap.forEach(doc => {
-        const data = doc.data() as any;
-        const matchKey = data.match_id || data.matchId;
-        if (matchKey) doublePicksSet.add(matchKey);
-      });
+      if (!predSnap.empty) {
+        console.log(`>>> [ROUNDS] Found ${predSnap.size} predictions`);
+        predSnap.forEach(doc => {
+          const data = doc.data() as any;
+          // FIX: Match ID can be 'match_id' OR 'matchId'
+          const matchKey = data.match_id || data.matchId; 
+          if (matchKey) {
+            predictionsMap.set(matchKey, { id: doc.id, ...data });
+          }
+        });
+      } else {
+        console.log(">>> [ROUNDS] No predictions found. Check DB field names!");
+      }
+
+      // Fetch Double Picks (Robustly)
+      let doubleSnap;
+      try {
+        doubleSnap = await db.collection("double_picks").where("user_id", "==", user.userId).get();
+      } catch (e) { doubleSnap = { empty: true, docs: [] } as any; }
+
+      if (doubleSnap.empty) {
+         try { doubleSnap = await db.collection("double_picks").where("userId", "==", user.userId).get(); } catch (e) { /* */ }
+      }
+
+      if (!doubleSnap.empty) {
+        doubleSnap.forEach(doc => {
+          const data = doc.data() as any;
+          const matchKey = data.match_id || data.matchId;
+          if (matchKey) doublePicksSet.add(matchKey);
+        });
+      }
     }
 
     // 3. Merge Data
     const rounds = roundsData.map((round: any) => {
-      // FIX: Type 'm' as any to allow accessing round_id or roundId
       const roundMatches = matchesData.filter((m: any) => 
-        m.round_id === round.id || m.roundId === round.id
+        (m.round_id || m.roundId) === round.id
       );
 
       return {
@@ -88,7 +112,7 @@ export async function GET() {
 
     return NextResponse.json({ rounds });
   } catch (error) {
-    console.error(">>> [API ERROR]", error);
+    console.error(">>> [ROUNDS ERROR]", error);
     return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
 }
