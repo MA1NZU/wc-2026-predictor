@@ -11,37 +11,56 @@ export async function POST(req: NextRequest) {
 
     const { matchId, roundId } = await req.json();
 
-    const { data: match } = await supabase
-      .from("matches")
-      .select("*, rounds!inner(status)")
-      .eq("id", matchId)
-      .single();
-
-    if (!match) {
+    // 1. Fetch Match
+    const matchSnap = await db.collection("matches").doc(matchId).get();
+    if (!matchSnap.exists) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 });
     }
+    const matchData = matchSnap.data() as any;
 
-    if (match.is_live || match.rounds.status === "LIVE" || match.rounds.status === "FINISHED") {
+    // 2. Fetch Round to check status
+    // Note: We use the roundId from the request body.
+    const roundSnap = await db.collection("rounds").doc(roundId).get();
+    if (!roundSnap.exists) {
+      return NextResponse.json({ error: "Round not found" }, { status: 404 });
+    }
+    const roundData = roundSnap.data() as any;
+
+    // 3. Check Locking Conditions
+    // Fixed corrupted variable name: matchData.is_live
+    if (matchData.is_live || roundData.status === "LIVE" || roundData.status === "FINISHED") {
       return NextResponse.json({ error: "Round is locked" }, { status: 403 });
     }
 
-    await supabase
-      .from("double_picks")
-      .delete()
-      .eq("user_id", user.userId)
-      .eq("round_id", roundId);
+    // 4. Delete existing picks for this user/round
+    // Firestore requires querying then deleting in a batch
+    const picksQuery = db.collection("double_picks")
+        .where("user_id", "==", user.userId)
+        .where("round_id", "==", roundId);
+    
+    const picksSnap = await picksQuery.get();
+    const batch = db.batch();
+    
+    picksSnap.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
 
-    const { data: doublePick, error } = await supabase
-      .from("double_picks")
-      .insert({ user_id: user.userId, round_id: roundId, match_id: matchId })
-      .select()
-      .single();
+    // 5. Insert new pick
+    const newPickData = {
+        user_id: user.userId,
+        round_id: roundId,
+        match_id: matchId,
+        createdAt: new Date()
+    };
+    
+    const docRef = await db.collection("double_picks").add(newPickData);
 
-    if (error) {
-      return NextResponse.json({ error: "Failed to set double pick" }, { status: 500 });
-    }
+    return NextResponse.json({ 
+        doublePick: { id: docRef.id, ...newPickData } 
+    });
 
-    return NextResponse.json({ doublePick });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
