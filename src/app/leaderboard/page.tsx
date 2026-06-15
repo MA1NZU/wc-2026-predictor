@@ -183,7 +183,6 @@ export default function LeaderboardPage() {
                 {index === 0 && (
                   <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-wc-gold/20 text-wc-gold uppercase tracking-wider">#1</span>
                 )}
-                <p className="text-xs text-white/30 mt-0.5">{user.predictionsCount} predictions</p>
               </div>
               <div className="text-right font-bold text-lg text-wc-gold">
                 {user.totalPoints}
