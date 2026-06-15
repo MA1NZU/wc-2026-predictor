@@ -7,19 +7,20 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const payload = await getUser();
-    if (!payload) {
+
+    if (!payload || !payload.userId) {
       return NextResponse.json({ user: null }, { status: 401 });
     }
 
-    const { data: user } = await supabase
-      .from("users")
-      .select("id, email, username, is_admin")
-      .eq("id", payload.userId)
-      .single();
+    // Firebase Admin: Fetch user document directly by ID
+    const userRef = db.collection("users").doc(payload.userId);
+    const userSnap = await userRef.get();
 
-    if (!user) {
+    if (!userSnap.exists) {
       return NextResponse.json({ user: null }, { status: 401 });
     }
+
+    const user = { id: userSnap.id, ...userSnap.data() } as any;
 
     return NextResponse.json({
       user: {
