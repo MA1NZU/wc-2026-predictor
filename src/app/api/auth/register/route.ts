@@ -12,54 +12,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    const { data: existingEmail } = await supabase
-      .from("users")
-      .select("id")
-      .eq("email", email)
-      .limit(1)
-      .single();
-
-    if (existingEmail) {
+    // Check if email exists
+    const emailQuery = await db.collection("users").where("email", "==", email).limit(1).get();
+    if (!emailQuery.empty) {
       return NextResponse.json({ error: "Email already taken" }, { status: 400 });
     }
 
-    const { data: existingUsername } = await supabase
-      .from("users")
-      .select("id")
-      .eq("username", username)
-      .limit(1)
-      .single();
-
-    if (existingUsername) {
+    // Check if username exists
+    const usernameQuery = await db.collection("users").where("username", "==", username).limit(1).get();
+    if (!usernameQuery.empty) {
       return NextResponse.json({ error: "Username already taken" }, { status: 400 });
     }
 
     const hashed = await hashPassword(password);
-    const { data: user, error } = await supabase
-      .from("users")
-      .insert({ email, username, password: hashed, is_admin: false })
-      .select()
-      .single();
 
-    if (error || !user) {
-      return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
-    }
-
-    const token = await signToken(user.id, user.email, user.is_admin);
-    const response = NextResponse.json({
-      user: { id: user.id, email: user.email, username: user.username, isAdmin: user.is_admin },
+    // Create user
+    const docRef = await db.collection("users").add({
+      email,
+      username,
+      password: hashed,
+      is_admin: false,
+      createdAt: new Date(),
     });
+
+    // Construct the user object since .add() returns the reference, not the data
+    const newUser = {
+      id: docRef.id,
+      email,
+      username,
+      is_admin: false,
+    };
+
+    const token = await signToken(newUser.id, newUser.email, newUser.is_admin);
+
+    const response = NextResponse.json({
+      user: { 
+          id: newUser.id, 
+          email: newUser.email, 
+          username: newUser.username, 
+          isAdmin: newUser.is_admin 
+      },
+    });
+
     response.cookies.set("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
-
-    return response;
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
-  }
-}
+      sameSite: 
