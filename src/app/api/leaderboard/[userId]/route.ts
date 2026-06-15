@@ -8,49 +8,74 @@ function calculatePoints(
   match: { home_score: number | null; away_score: number | null }
 ) {
   if (match.home_score === null || match.away_score === null) return 0;
+
   if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
-  const predOutcome = pred.home_score > pred.away_score ? "home" : pred.home_score < pred.away_score ? "away" : "draw";
-  const actOutcome = match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
+  const predOutcome =
+    pred.home_score > pred.away_score
+      ? "home"
+      : pred.home_score < pred.away_score
+      ? "away"
+      : "draw";
+
+  const actOutcome =
+    match.home_score > match.away_score
+      ? "home"
+      : match.home_score < match.away_score
+      ? "away"
+      : "draw";
 
   if (predOutcome === actOutcome) return 3;
+
   return 0;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { userId: string } }
+) {
   try {
-    const { userId } = params;
+    const { userId } = await params; // Await params in Next.js App Router
 
-    const { data: user } = await supabase
-      .from("users")
-      .select("id, username")
-      .eq("id", userId)
-      .single();
-
-    if (!user) {
+    // 1. Fetch User
+    const userSnap = await db.collection("users").doc(userId).get();
+    if (!userSnap.exists) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
+    const user = { id: userSnap.id, ...userSnap.data() } as any;
 
-    const { data: predictions } = await supabase
-      .from("predictions")
-      .select("*")
-      .eq("user_id", userId);
+    // 2. Fetch Predictions
+    const predSnap = await db
+      .collection("predictions")
+      .where("user_id", "==", userId)
+      .get();
+    
+    // 3. Fetch Matches
+    const matchSnap = await db.collection("matches").get();
 
-    const { data: matches } = await supabase.from("matches").select("*");
-    const { data: doublePicks } = await supabase
-      .from("double_picks")
-      .select("*")
-      .eq("user_id", userId);
+    // 4. Fetch Double Picks
+    const doubleSnap = await db
+      .collection("double_picks")
+      .where("user_id", "==", userId)
+      .get();
 
+    // Prepare Maps
     const matchesMap = new Map<string, any>();
-    (matches || []).forEach((m: any) => matchesMap.set(m.id, m));
+    matchSnap.docs.forEach((doc) => {
+      matchesMap.set(doc.id, { id: doc.id, ...doc.data() });
+    });
 
     const doubleSet = new Set<string>();
-    (doublePicks || []).forEach((d: any) => doubleSet.add(d.match_id));
+    doubleSnap.docs.forEach((doc) => {
+      doubleSet.add(doc.data().match_id);
+    });
 
-    const predictionsDetail = (predictions || [])
-      .map((pred: any) => {
+    // Map and calculate points
+    const predictionsDetail = predSnap.docs
+      .map((predDoc) => {
+        const pred = { id: predDoc.id, ...predDoc.data() };
         const match = matchesMap.get(pred.match_id);
+        
         if (!match) return null;
 
         const base = calculatePoints(pred, match);
@@ -76,11 +101,13 @@ export async function GET(req: NextRequest, { params }: { params: { userId: stri
       })
       .filter(Boolean);
 
+    // Sort by date
     predictionsDetail.sort(
       (a: any, b: any) =>
         new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
     );
 
+    // Sum points
     let totalPoints = 0;
     predictionsDetail.forEach((p: any) => {
       totalPoints += p.points;
