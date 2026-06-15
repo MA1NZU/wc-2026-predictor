@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Sign Token
-    const token = await signToken(user.id, user.email, user.is_admin);
+    const adminStatus = user.is_admin || user.isAdmin || false; 
+    const token = await signToken(user.id, user.email, adminStatus);
 
     // 5. Set Cookie & Return Response
     const response = NextResponse.json({
