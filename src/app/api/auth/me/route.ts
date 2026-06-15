@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
 
 export const dynamic = "force-dynamic";
 
