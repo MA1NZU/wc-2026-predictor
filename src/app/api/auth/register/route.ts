@@ -35,7 +35,6 @@ export async function POST(req: NextRequest) {
       createdAt: new Date(),
     });
 
-    // Construct the user object since .add() returns the reference, not the data
     const newUser = {
       id: docRef.id,
       email,
@@ -57,4 +56,15 @@ export async function POST(req: NextRequest) {
     response.cookies.set("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: 
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
+
+    return response;
+
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
