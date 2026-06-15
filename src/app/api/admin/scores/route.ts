@@ -12,23 +12,34 @@ export async function PATCH(req: NextRequest) {
 
     const { id, homeScore, awayScore } = await req.json();
 
+    if (!id) {
+      return NextResponse.json({ error: "Match ID is required" }, { status: 400 });
+    }
+
     const updateData: any = {};
     if (homeScore !== undefined) updateData.home_score = homeScore === null ? null : Number(homeScore);
     if (awayScore !== undefined) updateData.away_score = awayScore === null ? null : Number(awayScore);
 
-    const { data: match, error } = await supabase
-      .from("matches")
-      .update(updateData)
-      .eq("id", id)
-      .select()
-      .single();
+    // Firebase Admin Update
+    const matchRef = db.collection("matches").doc(id);
+    await matchRef.update(updateData);
 
-    if (error || !match) {
-      return NextResponse.json({ error: "Failed to update score" }, { status: 500 });
+    // Fetch the updated document to return it
+    const matchSnap = await matchRef.get();
+
+    if (!matchSnap.exists) {
+      return NextResponse.json({ error: "Match not found" }, { status: 404 });
     }
 
     clearCache();
-    return NextResponse.json({ match });
+
+    return NextResponse.json({ 
+      match: { 
+          id: matchSnap.id, 
+          ...matchSnap.data() 
+      } 
+    });
+
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Failed to update score" }, { status: 500 });
