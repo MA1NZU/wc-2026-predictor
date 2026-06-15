@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { db } from "@/lib/firebase";
 import { comparePassword, signToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
