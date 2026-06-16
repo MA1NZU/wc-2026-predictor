@@ -1,6 +1,7 @@
 "use client";
+
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
-import { db } from "@/lib/firebase-client"; 
+import { db } from "@/lib/firebase-client"; // Ensure this points to your client SDK
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -14,7 +15,7 @@ function calculatePoints(
   pred: { home_score?: number; away_score?: number },
   match: { home_score?: number | null; away_score?: number | null }
 ) {
-  // If match score is missing, points cannot be calculated yet
+  // If match score is missing, points cannot be calculated yet -> null (Pending)
   if (match.home_score == null || match.away_score == null) return null;
   if (pred.home_score == null || pred.away_score == null) return null;
 
@@ -45,7 +46,6 @@ function calculatePoints(
 const GameContext = createContext<any>(null);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  // Use 'authUser' to access the logged-in user
   const { user: authUser, loading: authLoading } = useAuth();
   
   const [matches, setMatches] = useState<Match[]>([]);
@@ -55,7 +55,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Setup Real-time Listeners
+  // 1. Setup Real-time Listeners
   useEffect(() => {
     const qMatches = query(collection(db, "matches"), orderBy("order", "asc"));
     const qPredictions = query(collection(db, "predictions"));
@@ -100,6 +100,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       user.predictionsCount++;
       
       const base = calculatePoints(pred, match);
+      // Only count points if match is finished (not null)
       if (base !== null) {
         const isDoubled = doublePicks.some(d => (d.match_id === matchId || d.matchId === matchId) && (d.user_id === userId || d.userId === userId));
         user.totalPoints += base * (isDoubled ? 2 : 1);
@@ -113,16 +114,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // 3. Compute Current User's View (Derived State)
   const myRounds = useMemo(() => {
-    // FIX: Use 'authUser?.id' instead of 'authUser?.userId' to match your API response
-    if (!authUser?.id || matches.length === 0) return [];
+    // FIX: Cast to any to bypass TypeScript strictness and handle both 'id' and 'userId'
+    // This resolves the "Property 'userId' does not exist" error.
+    const u = authUser as any;
+    const currentUserId = u?.id || u?.userId;
+
+    if (!currentUserId || matches.length === 0) return [];
 
     // Get my predictions
-    const myPreds = predictions.filter(p => (p.user_id === authUser.id || p.userId === authUser.id));
+    const myPreds = predictions.filter(p => (p.user_id === currentUserId || p.userId === currentUserId));
     const predMap = new Map();
     myPreds.forEach(p => predMap.set(p.match_id || p.matchId, p));
 
     // Get my double picks
-    const myDoubles = doublePicks.filter(d => (d.user_id === authUser.id || d.userId === authUser.id));
+    const myDoubles = doublePicks.filter(d => (d.user_id === currentUserId || d.userId === currentUserId));
     const doubleSet = new Set(myDoubles.map(d => d.match_id || d.matchId));
 
     return rounds.map(round => ({
@@ -151,7 +156,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             isLive: match.is_live ?? false,
             prediction: pred ? { homeScore: pred.home_score, awayScore: pred.away_score } : null,
             doublePick: isDoubled,
-            points // Will be null (Pending), 0 (Miss), or points
+            points // null = pending, 0 = miss, >0 = success
           };
         })
     }));
