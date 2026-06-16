@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { useGameContext } from "@/context/GameContext"; // Import the shared real-time context
+import { useGameContext } from "@/context/GameContext";
 import {
   Swords,
   Lock,
@@ -19,6 +19,7 @@ import {
   Medal,
 } from "lucide-react";
 
+// Explicit types to satisfy TypeScript when reading from Context
 type Match = {
   id: string;
   homeTeam: string;
@@ -28,7 +29,7 @@ type Match = {
   awayScore: number | null;
   prediction: { homeScore: number; awayScore: number } | null;
   doublePick: boolean;
-  points: number | null; // null = pending, 0 = miss, >0 = success
+  points: number | null;
   isLive?: boolean;
 };
 
@@ -42,21 +43,26 @@ type Round = {
 function getFlag(team: string) {
   if (!team) return "🏳️";
   const upper = team.toUpperCase().trim();
-
   const flags: Record<string, string> = {
-    FRANCE: "🇫🇷", GERMANY: "🇩🇪", ENGLAND: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SPAIN: "🇪🇸", PORTUGAL: "🇵🇹",
+     FRANCE: "🇫🇷", GERMANY: "🇩🇪", ENGLAND: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SPAIN: "🇪🇸", PORTUGAL: "🇵🇹",
     NETHERLANDS: "🇳🇱", BELGIUM: "🇧🇪", ITALY: "🇮🇹", CROATIA: "🇭🇷", DENMARK: "🇩🇰",
     SWITZERLAND: "🇨🇭", POLAND: "🇵🇱", WALES: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", SCOTLAND: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", UKRAINE: "🇺🇦",
     AUSTRIA: "🇦🇹", SERBIA: "🇷🇸", SWEDEN: "🇸🇪", NORWAY: "🇳🇴", CZECHIA: "🇨🇿",
     CZECH: "🇨🇿", HUNGARY: "🇭🇺", ROMANIA: "🇷🇴", SLOVAKIA: "🇸🇰", SLOVENIA: "🇸🇮",
     GREECE: "🇬🇷", TURKEY: "🇹🇷", IRELAND: "🇮🇪", NORTHERN: "🇬🇧", BOSNIA: "🇧🇦",
     FINLAND: "🇫🇮", RUSSIA: "🇷🇺", "SOUTH AFRICA": "🇿🇦", "TURKIYE": "🇹🇷", "SOUTH KOREA": "🇰🇷", "IVORY COAST": "🇨🇮", "CAPE VERDE": "🇨🇻", "SAUDI ARABIA": "🇸🇦", "DR CONGO": "🇨🇬",
+
+    /* ---------- CONMEBOL (6) ---------- */
     ARGENTINA: "🇦🇷", BRAZIL: "🇧🇷", URUGUAY: "🇺🇾", COLOMBIA: "🇨🇴", ECUADOR: "🇪🇨",
-    CHILE: "🇨🇱", PERU: "🇵🇪", PARAGUAY: "🇵🇾", BOLIVIA: "🇧🇴", VENEZUELA: "🇻🇪",
+    CHILE: "🇨🇱", PERU: "🇵🇪", PARAGUAY: "🇵🇾", BOLIVIA: "🇧🇴", VENEZUELA: "🇻🇪", 
+
+    /* ---------- CONCACAF (9 incl. 3 hosts) ---------- */
     USA: "🇺🇸", CANADA: "🇨🇦", MEXICO: "🇲🇽", PANAMA: "🇵🇦", COSTA: "🇨🇷",
     RICA: "🇨🇷", HONDURAS: "🇭🇳", JAMAICA: "🇯🇲", EL: "🇸🇻", SALVADOR: "🇸🇻",
     GUATEMALA: "🇬🇹", HAITI: "🇭🇹", TRINIDAD: "🇹🇹", CUBA: "🇨🇺", CURACAO: "🇨🇼",
     NICARAGUA: "🇳🇮", BERMUDA: "🇧🇲",
+
+    /* ---------- CAF (9) ---------- */
     MOROCCO: "🇲🇦", EGYPT: "🇪🇬", SENEGAL: "🇸🇳", TUNISIA: "🇹🇳", ALGERIA: "🇩🇿",
     NIGERIA: "🇳🇬", CAMEROON: "🇨🇲", GHANA: "🇬🇭", IVORY: "🇨🇮", COTE: "🇨🇮",
     "CÔTE D'IVOIRE": "🇨🇮", MALI: "🇲🇱", BURKINA: "🇧🇫", SOUTH: "🇿🇦", KENYA: "🇰🇪",
@@ -68,6 +74,8 @@ function getFlag(team: string) {
     CHAD: "🇹🇩", ERITREA: "🇪🇷", DJIBOUTI: "🇩🇯", CENTRAL: "🇨🇫", EQUATORIAL: "🇬🇶",
     SAO: "🇸🇹", CAPE: "🇨🇻", SEYCHELLES: "🇸🇨", MAURITIUS: "🇲🇺", BURUNDI: "🇧🇮",
     SOMALIA: "🇸🇴", SOUTHSUDAN: "🇸🇸", "SOUTH SUDAN": "🇸🇸",
+
+    /* ---------- AFC (8) ---------- */
     JAPAN: "🇯🇵", KOREA: "🇰🇷", AUSTRALIA: "🇦🇺", IRAN: "🇮🇷", SAUDI: "🇸🇦",
     ARABIA: "🇸🇦", QATAR: "🇶🇦", IRAQ: "🇮🇶", UZBEKISTAN: "🇺🇿", JORDAN: "🇯🇴",
     UAE: "🇦🇪", BAHRAIN: "🇧🇭", CHINA: "🇨🇳", THAILAND: "🇹🇭", INDONESIA: "🇮🇩",
@@ -78,6 +86,8 @@ function getFlag(team: string) {
     PAKISTAN: "🇵🇰", SRI: "🇱🇰", BHUTAN: "🇧🇹", MALDIVES: "🇲🇻", GUAM: "🇬🇺",
     CAMBODIA: "🇰🇭", LAOS: "🇱🇦", MYANMAR: "🇲🇲", BRUNEI: "🇧🇳", PHILIPPINES: "🇵🇭",
     NORTH: "🇰🇵",
+
+    /* ---------- OFC (1) ---------- */
     "NEW ZEALAND": "🇳🇿", FIJI: "🇫🇯", PAPUA: "🇵🇬", NEWCALEDONIA: "🇳🇨", TAHITI: "🇵🇫",
     SAMOA: "🇼🇸", VANUATU: "🇻🇺", SOLOMON: "🇸🇧",
   };
@@ -94,47 +104,39 @@ function formatDate(dateStr: string) {
 }
 
 function getPointsLabel(points: number | null, isDoubled: boolean) {
-  if (points === null) return null; // Pending
+  if (points === null) return null;
   if (points === 0) return { text: "Miss", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
-  
-  // Doubled
   if (isDoubled) {
     if (points === 12) return { text: "Perfect 2x", color: "text-yellow-400", bg: "bg-yellow-400/20", border: "border-yellow-400/30" };
     if (points === 6) return { text: "Outcome 2x", color: "text-blue-400", bg: "bg-blue-400/20", border: "border-blue-400/30" };
   }
-  
-  // Not doubled
   if (points === 6) return { text: "Perfect", color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20" };
   if (points === 3) return { text: "Outcome", color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20" };
-  
   return { text: `${points}pts`, color: "text-white", bg: "bg-white/5", border: "border-white/10" };
 }
 
 export default function PredictPage() {
   const { user, loading: authLoading } = useAuth();
-  // Read from Context (Real-time)
   const { myRounds, loading: contextLoading } = useGameContext();
 
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [inputs, setInputs] = useState<Record<string, { home: string; away: string }>>({});
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
-  // Sync inputs from Context when data changes
+  // Sync inputs from Context
   useEffect(() => {
     if (myRounds && myRounds.length > 0) {
-      // Set active tab if not set
-      if (!activeTab) {
-        setActiveTab(myRounds[0].id);
-      }
+      const rounds = myRounds as Round[];
+      if (!activeTab) setActiveTab(rounds[0].id);
 
-      // Populate input fields if user has predictions
       setInputs((prev) => {
-        // Don't overwrite if user has typed (unless inputs empty)
-        if (Object.keys(prev).length > 0 && Object.values(prev).some(v => v.home !== "" || v.away !== "")) return prev;
+        // Check if we already have inputs filled by the user to avoid overwriting
+        const hasUserInput = Object.values(prev).some(v => v.home !== "" || v.away !== "");
+        if (hasUserInput && Object.keys(prev).length > 0) return prev;
 
         const newInputs: Record<string, { home: string; away: string }> = {};
-        myRounds.forEach((r: Round) => {
-          r.matches.forEach((m: Match) => {
+        rounds.forEach((r) => {
+          r.matches.forEach((m) => {
             if (m.prediction) {
               newInputs[m.id] = {
                 home: String(m.prediction.homeScore),
@@ -165,8 +167,7 @@ export default function PredictPage() {
       });
 
       if (res.ok) {
-        // No manual fetch needed! Context onSnapshot will auto-update myRounds
-        setInputs(prev => ({ ...prev, [matchId]: { ...prev[matchId] } }));
+        // Context onSnapshot will auto-update myRounds, so we don't need to fetch manually
       } else {
         const err = await res.json();
         alert(err.error || "Failed to save prediction");
@@ -185,7 +186,6 @@ export default function PredictPage() {
       body: JSON.stringify({ roundId, matchId }),
     });
     if (!res.ok) alert("Failed to set double pick");
-    // Auto-updates via Context listener
   };
 
   if (authLoading || contextLoading) {
@@ -214,8 +214,9 @@ export default function PredictPage() {
     );
   }
 
-  // FIX: Explicitly type 'r' as Round to fix TypeScript error
-  const activeRound: Round | undefined = myRounds?.find((r: Round) => r.id === activeTab) || myRounds?.[0];
+  // Cast myRounds to Round[] so TypeScript knows what fields exist
+  const rounds = myRounds as Round[] | undefined;
+  const activeRound = rounds?.find((r) => r.id === activeTab) || rounds?.[0];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
@@ -233,9 +234,9 @@ export default function PredictPage() {
       </div>
 
       {/* Round Tabs */}
-      {myRounds && myRounds.length > 1 && (
+      {rounds && rounds.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-4 mb-4 sm:mb-6 scrollbar-hide">
-          {myRounds.map((round: Round) => {
+          {rounds.map((round) => {
             const isActive = activeTab === round.id;
             const liveGlow = round.status === "LIVE" && !isActive;
             return (
@@ -291,7 +292,7 @@ export default function PredictPage() {
 
           {/* Matches Grid */}
           <div className="grid gap-3 sm:gap-4">
-            {activeRound.matches.map((match: Match) => {
+            {activeRound.matches.map((match) => {
               const inp = inputs[match.id] || { home: "", away: "" };
               const isLocked = match.isLive || activeRound.status === "LIVE" || activeRound.status === "FINISHED";
               const hasPrediction = match.prediction !== null;
@@ -370,7 +371,7 @@ export default function PredictPage() {
                       <div className="flex items-center justify-center lg:justify-end gap-2 sm:gap-3">
                         {isLocked ? (
                           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-                            {pointsMeta ? (
+                            {pointsMeta && (
                               <div className={`px-3 sm:px-4 py-2 rounded-xl border ${pointsMeta.bg} ${pointsMeta.border} flex items-center gap-2`}>
                                 <Medal className={`w-4 h-4 ${pointsMeta.color}`} />
                                 <div>
@@ -378,14 +379,14 @@ export default function PredictPage() {
                                   <div className={`text-[10px] sm:text-xs ${pointsMeta.color} opacity-60`}>{match.points} pts</div>
                                 </div>
                               </div>
-                            ) : (
-                              hasPrediction && (
-                                <div className="px-3 sm:px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-white/30 text-xs sm:text-sm font-bold flex items-center gap-2">
-                                  <Clock className="w-4 h-4" /> Pending
-                                </div>
-                              )
                             )}
                             
+                            {!pointsMeta && hasPrediction && (
+                              <div className="px-3 sm:px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-white/30 text-xs sm:text-sm font-bold flex items-center gap-2">
+                                <Clock className="w-4 h-4" /> Pending
+                              </div>
+                            )}
+
                             {!hasPrediction && (
                               <div className="px-3 sm:px-4 py-2 rounded-xl border border-red-500/10 bg-red-500/5 text-red-400/70 text-xs sm:text-sm font-bold flex items-center gap-2">
                                 <XCircle className="w-4 h-4" /> No Prediction
@@ -401,33 +402,23 @@ export default function PredictPage() {
                         ) : (
                           <>
                             <div className="flex items-center gap-2">
-                              <div className="relative">
-                                <input 
-                                  type="number" 
-                                  min={0} 
-                                  value={inp.home} 
-                                  onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, home: e.target.value } })} 
-                                  placeholder="0" 
-                                  className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/20 transition" 
-                                />
-                                {hasPrediction && match.prediction?.homeScore === Number(inp.home) && inp.home !== "" && (
-                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0f172a]" />
-                                )}
-                              </div>
+                              <input 
+                                type="number" 
+                                min={0} 
+                                value={inp.home} 
+                                onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, home: e.target.value } })} 
+                                placeholder="0" 
+                                className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/20 transition" 
+                              />
                               <span className="text-white/20 font-bold">-</span>
-                              <div className="relative">
-                                <input 
-                                  type="number" 
-                                  min={0} 
-                                  value={inp.away} 
-                                  onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, away: e.target.value } })} 
-                                  placeholder="0" 
-                                  className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/20 transition" 
-                                />
-                                {hasPrediction && match.prediction?.awayScore === Number(inp.away) && inp.away !== "" && (
-                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0f172a]" />
-                                )}
-                              </div>
+                              <input 
+                                type="number" 
+                                min={0} 
+                                value={inp.away} 
+                                onChange={(e) => setInputs({ ...inputs, [match.id]: { ...inp, away: e.target.value } })} 
+                                placeholder="0" 
+                                className="w-14 sm:w-16 h-12 sm:h-12 text-center text-lg font-bold px-2 rounded-xl bg-white/5 border border-white/10 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/20 transition" 
+                              />
                               <button 
                                 onClick={() => savePrediction(match.id)} 
                                 disabled={saving[match.id]} 
