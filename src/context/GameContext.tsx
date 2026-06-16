@@ -1,18 +1,14 @@
 "use client";
-
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
-import { db } from "@/lib/firebase-client";
+import { db } from "@/lib/firebase-client"; // Imports from the NEW file we just created
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 
-// Define types as 'any' to handle Firestore flexibility safely
 type Match = any;
 type Prediction = any;
-type Round = any;
 
-// --- Point Calculation Logic ---
 function calculatePoints(pred: any, match: any): number | null {
-  // If match score is missing, points cannot be calculated yet -> null (Pending)
+  // FIX: Return null if scores aren't ready (Pending)
   if (match.home_score == null || match.away_score == null) return null;
   if (pred.home_score == null || pred.away_score == null) return null;
 
@@ -22,28 +18,23 @@ function calculatePoints(pred: any, match: any): number | null {
   const actOutcome = match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
 
   if (predOutcome === actOutcome) return 3;
-  return 0;
+  return 0; // Miss
 }
 
 const GameContext = createContext<any>(null);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const auth = useAuth();
-  // FIX: Cast to 'any' to bypass strict 'User' type checking
-  const authUser = auth?.user as any;
-  const authLoading = auth?.loading;
-
+  const { user: authUser, loading: authLoading } = useAuth();
+  
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [doublePicks, setDoublePicks] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  const [rounds, setRounds] = useState<Round[]>([]);
+  const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Setup Real-time Listeners
   useEffect(() => {
     if (!db) return;
-
     const qMatches = query(collection(db, "matches"), orderBy("order", "asc"));
     const qPredictions = query(collection(db, "predictions"));
     const qDoublePicks = query(collection(db, "double_picks"));
@@ -62,55 +53,41 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return () => unsubR.forEach(u => u());
   }, []);
 
-  // 1. Compute Leaderboard (Derived State)
   const leaderboard = useMemo(() => {
     if (matches.length === 0) return [];
-
     const userScores: Record<string, any> = {};
-    users.forEach(u => {
-      userScores[u.id] = { id: u.id, username: u.username, totalPoints: 0, predictionsCount: 0 };
-    });
+    users.forEach(u => userScores[u.id] = { id: u.id, username: u.username, totalPoints: 0, predictionsCount: 0 });
 
     predictions.forEach(pred => {
       const userId = pred.user_id || pred.userId;
       const matchId = pred.match_id || pred.matchId;
-      
       if (!userId || !matchId) return;
       const match = matches.find(m => m.id === matchId);
-      if (!match) return;
-      const user = userScores[userId];
-      if (!user) return;
+      if (!match || !userScores[userId]) return;
 
-      user.predictionsCount++;
-      
+      userScores[userId].predictionsCount++;
       const base = calculatePoints(pred, match);
       if (base !== null) {
-        const isDoubled = doublePicks.some(d => {
-           const dMatchId = d.match_id || d.matchId;
-           const dUserId = d.user_id || d.userId;
-           return dMatchId === matchId && dUserId === userId;
-        });
-        user.totalPoints += base * (isDoubled ? 2 : 1);
+        const isDoubled = doublePicks.some(d => (d.match_id === matchId || d.matchId === matchId) && (d.user_id === userId || d.userId === userId));
+        userScores[userId].totalPoints += base * (isDoubled ? 2 : 1);
       }
-      const userData = users.find(u => u.id === userId);
-      if (userData?.bonusPoints) user.totalPoints += userData.bonusPoints;
+      const uData = users.find(u => u.id === userId);
+      if (uData?.bonusPoints) userScores[userId].totalPoints += uData.bonusPoints;
     });
-
-    return Object.values(userScores).sort((a, b) => b.totalPoints - a.totalPoints);
+    return Object.values(userScores).sort((a: any, b: any) => b.totalPoints - a.totalPoints);
   }, [matches, predictions, doublePicks, users]);
 
-  // 2. Compute Current User's View (Derived State)
   const myRounds = useMemo(() => {
-    // FIX: Access ID safely using 'any' cast
-    const currentUserId = authUser?.id || authUser?.userId;
-
+    // FIX: Use 'as any' to prevent TypeErrors if 'id' or 'userId' is missing
+    const u = authUser as any;
+    const currentUserId = u?.id || u?.userId;
     if (!currentUserId || matches.length === 0) return [];
 
-    const myPreds = predictions.filter(p => (p.user_id === currentUserId || p.userId === currentUserId));
+    const myPreds = predictions.filter(p => p.user_id === currentUserId || p.userId === currentUserId);
     const predMap = new Map();
     myPreds.forEach(p => predMap.set(p.match_id || p.matchId, p));
 
-    const myDoubles = doublePicks.filter(d => (d.user_id === currentUserId || d.userId === currentUserId));
+    const myDoubles = doublePicks.filter(d => d.user_id === currentUserId || d.userId === currentUserId);
     const doubleSet = new Set(myDoubles.map(d => d.match_id || d.matchId));
 
     return rounds.map((round: any) => ({
@@ -118,28 +95,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       name: round.name,
       status: round.status,
       matches: matches
-        .filter(m => (m.round_id || m.roundId) === round.id)
-        .map((match: any) => {
+        .filter(m => m.round_id === round.id || m.roundId === round.id)
+        .map(match => {
           const pred = predMap.get(match.id);
           const isDoubled = doubleSet.has(match.id);
-          
           let points = null;
           if (pred) {
              points = calculatePoints(pred, match);
              if (points !== null && isDoubled) points *= 2;
           }
-
           return {
             id: match.id,
-            homeTeam: match.home_team || match.homeTeam,
-            awayTeam: match.away_team || match.awayTeam,
+            homeTeam: match.home_team || match.homeTeam || "TBD",
+            awayTeam: match.away_team || match.awayTeam || "TBD",
             matchDate: match.match_date || match.matchDate,
             homeScore: match.home_score ?? null,
             awayScore: match.away_score ?? null,
             isLive: match.is_live ?? false,
             prediction: pred ? { homeScore: pred.home_score, awayScore: pred.away_score } : null,
             doublePick: isDoubled,
-            points // null = pending
+            points
           };
         })
     }));
@@ -151,5 +126,4 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     </GameContext.Provider>
   );
 }
-
 export const useGameContext = () => useContext(GameContext);
