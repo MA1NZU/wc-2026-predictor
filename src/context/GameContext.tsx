@@ -1,31 +1,52 @@
 "use client";
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
-import { db } from "@/lib/firebase-client"; // Use the client SDK
+import { db } from "@/lib/firebase-client"; 
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 
-type Match = any; // Define strict types if needed
+// Types
+type Match = any; 
 type Prediction = any;
 
 // --- Point Calculation Logic ---
-function calculatePoints(pred: any, match: any) {
-  if (match.home_score == null || match.away_score == null) return null; // Pending
+// FIX: Returns null for pending matches so UI shows "Pending" instead of "Missed"
+function calculatePoints(
+  pred: { home_score?: number; away_score?: number },
+  match: { home_score?: number | null; away_score?: number | null }
+) {
+  // If match score is missing, points cannot be calculated yet
+  if (match.home_score == null || match.away_score == null) return null;
   if (pred.home_score == null || pred.away_score == null) return null;
 
+  // Exact score match = 6 pts
   if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
-  const predOutcome = pred.home_score > pred.away_score ? "home" : pred.home_score < pred.away_score ? "away" : "draw";
-  const actOutcome = match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
+  const predOutcome =
+    pred.home_score > pred.away_score
+      ? "home"
+      : pred.home_score < pred.away_score
+      ? "away"
+      : "draw";
 
+  const actOutcome =
+    match.home_score > match.away_score
+      ? "home"
+      : match.home_score < match.away_score
+      ? "away"
+      : "draw";
+
+  // Correct winner/draw = 3 pts
   if (predOutcome === actOutcome) return 3;
-  return 0;
+  
+  // Wrong outcome = 0 pts (This is a real Miss)
+  return 0; 
 }
 
-// --- Context ---
 const GameContext = createContext<any>(null);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const { user: authUser } = useAuth();
+  // Use 'authUser' to access the logged-in user
+  const { user: authUser, loading: authLoading } = useAuth();
   
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
@@ -34,7 +55,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. Setup Real-time Listeners (OnSnapshot)
+  // Setup Real-time Listeners
   useEffect(() => {
     const qMatches = query(collection(db, "matches"), orderBy("order", "asc"));
     const qPredictions = query(collection(db, "predictions"));
@@ -74,7 +95,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (!match) return;
 
       const user = userScores[userId];
-      if (!user) return; // Unknown user
+      if (!user) return;
 
       user.predictionsCount++;
       
@@ -83,7 +104,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         const isDoubled = doublePicks.some(d => (d.match_id === matchId || d.matchId === matchId) && (d.user_id === userId || d.userId === userId));
         user.totalPoints += base * (isDoubled ? 2 : 1);
       }
-      // Add bonus points if they exist
       const userData = users.find(u => u.id === userId);
       if (userData?.bonusPoints) user.totalPoints += userData.bonusPoints;
     });
@@ -93,15 +113,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   // 3. Compute Current User's View (Derived State)
   const myRounds = useMemo(() => {
-    if (!authUser?.userId || matches.length === 0) return [];
+    // FIX: Use 'authUser?.id' instead of 'authUser?.userId' to match your API response
+    if (!authUser?.id || matches.length === 0) return [];
 
     // Get my predictions
-    const myPreds = predictions.filter(p => (p.user_id === authUser.userId || p.userId === authUser.userId));
+    const myPreds = predictions.filter(p => (p.user_id === authUser.id || p.userId === authUser.id));
     const predMap = new Map();
     myPreds.forEach(p => predMap.set(p.match_id || p.matchId, p));
 
     // Get my double picks
-    const myDoubles = doublePicks.filter(d => (d.user_id === authUser.userId || d.userId === authUser.userId));
+    const myDoubles = doublePicks.filter(d => (d.user_id === authUser.id || d.userId === authUser.id));
     const doubleSet = new Set(myDoubles.map(d => d.match_id || d.matchId));
 
     return rounds.map(round => ({
@@ -130,14 +151,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             isLive: match.is_live ?? false,
             prediction: pred ? { homeScore: pred.home_score, awayScore: pred.away_score } : null,
             doublePick: isDoubled,
-            points
+            points // Will be null (Pending), 0 (Miss), or points
           };
         })
     }));
   }, [matches, predictions, doublePicks, rounds, authUser]);
 
   return (
-    <GameContext.Provider value={{ leaderboard, myRounds, loading }}>
+    <GameContext.Provider value={{ leaderboard, myRounds, loading: loading || authLoading }}>
       {children}
     </GameContext.Provider>
   );
