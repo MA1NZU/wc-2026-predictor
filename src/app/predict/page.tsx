@@ -166,8 +166,7 @@ export default function PredictPage() {
 
       if (res.ok) {
         // No manual fetch needed! Context onSnapshot will auto-update myRounds
-        // But we clear the saving state
-        setInputs(prev => ({ ...prev, [matchId]: { ...prev[matchId] } })); // force re-render if needed
+        setInputs(prev => ({ ...prev, [matchId]: { ...prev[matchId] } }));
       } else {
         const err = await res.json();
         alert(err.error || "Failed to save prediction");
@@ -215,7 +214,8 @@ export default function PredictPage() {
     );
   }
 
-  const activeRound = myRounds?.find((r) => r.id === activeTab) || myRounds?.[0];
+  // FIX: Explicitly type 'r' as Round to fix TypeScript error
+  const activeRound: Round | undefined = myRounds?.find((r: Round) => r.id === activeTab) || myRounds?.[0];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
@@ -235,7 +235,7 @@ export default function PredictPage() {
       {/* Round Tabs */}
       {myRounds && myRounds.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-4 mb-4 sm:mb-6 scrollbar-hide">
-          {myRounds.map((round) => {
+          {myRounds.map((round: Round) => {
             const isActive = activeTab === round.id;
             const liveGlow = round.status === "LIVE" && !isActive;
             return (
@@ -291,7 +291,7 @@ export default function PredictPage() {
 
           {/* Matches Grid */}
           <div className="grid gap-3 sm:gap-4">
-            {activeRound.matches.map((match) => {
+            {activeRound.matches.map((match: Match) => {
               const inp = inputs[match.id] || { home: "", away: "" };
               const isLocked = match.isLive || activeRound.status === "LIVE" || activeRound.status === "FINISHED";
               const hasPrediction = match.prediction !== null;
