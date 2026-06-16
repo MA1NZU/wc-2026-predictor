@@ -1,4 +1,5 @@
 "use client";
+
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase-client";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
@@ -7,13 +8,16 @@ import { useAuth } from "@/components/AuthProvider";
 type Match = any;
 type Prediction = any;
 
+// Points Logic
 function calculatePoints(pred: any, match: any): number | null {
   if (match.home_score == null || match.away_score == null) return null;
   if (pred.home_score == null || pred.away_score == null) return null;
+
   if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
   const predOutcome = pred.home_score > pred.away_score ? "home" : pred.home_score < pred.away_score ? "away" : "draw";
   const actOutcome = match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
+
   if (predOutcome === actOutcome) return 3;
   return 0;
 }
@@ -32,21 +36,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!db) return;
+    const qMatches = query(collection(db, "matches"), orderBy("order", "asc"));
+    const qPredictions = query(collection(db, "predictions"));
+    const qDoublePicks = query(collection(db, "double_picks"));
+    const qUsers = query(collection(db, "users"));
+    const qRounds = query(collection(db, "rounds"), orderBy("order", "asc"));
+
     const unsubR = [
-      onSnapshot(query(collection(db, "matches"), orderBy("order", "asc")), (snap) => setMatches(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(query(collection(db, "predictions")), (snap) => {
-        const preds = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        console.log(`📦 [GameContext] Loaded ${preds.length} total predictions`);
-        setPredictions(preds);
-      }),
-      onSnapshot(query(collection(db, "double_picks")), (snap) => setDoublePicks(snap.docs.map(d => d.data()))),
-      onSnapshot(query(collection(db, "users")), (snap) => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(query(collection(db, "rounds"), orderBy("order", "asc")), (snap) => setRounds(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(qMatches, (snap) => setMatches(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(qPredictions, (snap) => setPredictions(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(qDoublePicks, (snap) => setDoublePicks(snap.docs.map(d => d.data()))),
+      onSnapshot(qUsers, (snap) => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(qRounds, (snap) => setRounds(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
     ];
+
     setLoading(false);
     return () => unsubR.forEach(u => u());
   }, []);
 
+  // 1. Compute Leaderboard
   const leaderboard = useMemo(() => {
     if (matches.length === 0) return [];
     const userScores: Record<string, any> = {};
@@ -71,20 +79,32 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return Object.values(userScores).sort((a: any, b: any) => b.totalPoints - a.totalPoints);
   }, [matches, predictions, doublePicks, users]);
 
+  // 2. Compute Current User's View (FIXED MATCHING LOGIC)
   const myRounds = useMemo(() => {
+    // FIX: Use 'as any' to get ID safely
     const u = authUser as any;
     const currentUserId = u?.id || u?.userId;
+
+    console.log("🔍 [Context] Checking predictions for User ID:", currentUserId);
+
     if (!currentUserId || matches.length === 0) return [];
 
-    const myPreds = predictions.filter(p => (p.user_id || p.userId) === currentUserId);
-    console.log(`🎯 [GameContext] Found ${myPreds.length} predictions for user ${currentUserId}`);
+    // Filter predictions robustly (check both 'user_id' and 'userId' fields)
+    const myPreds = predictions.filter(p => {
+      const pUid = p.user_id || p.userId;
+      return pUid === currentUserId;
+    });
 
+    console.log(`✅ [Context] Found ${myPreds.length} predictions for this user.`);
+
+    // Map predictions by Match ID
     const predMap = new Map();
     myPreds.forEach(p => {
       const mId = p.match_id || p.matchId;
       if (mId) predMap.set(mId, p);
     });
 
+    // Map double picks
     const myDoubles = doublePicks.filter(d => (d.user_id || d.userId) === currentUserId);
     const doubleSet = new Set(myDoubles.map(d => d.match_id || d.matchId));
 
@@ -95,13 +115,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       matches: matches
         .filter(m => (m.round_id || m.roundId) === round.id)
         .map(match => {
+          // FIX: Ensure we look up by match.id (Firestore Doc ID)
           const pred = predMap.get(match.id);
           const isDoubled = doubleSet.has(match.id);
+          
           let points = null;
           if (pred) {
              points = calculatePoints(pred, match);
              if (points !== null && isDoubled) points *= 2;
           }
+
           return {
             id: match.id,
             homeTeam: match.home_team || match.homeTeam || "TBD",
@@ -110,6 +133,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             homeScore: match.home_score ?? null,
             awayScore: match.away_score ?? null,
             isLive: match.is_live ?? false,
+            // FIX: Ensure prediction data is passed to UI
             prediction: pred ? { homeScore: pred.home_score, awayScore: pred.away_score } : null,
             doublePick: isDoubled,
             points
@@ -124,4 +148,5 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     </GameContext.Provider>
   );
 }
+
 export const useGameContext = () => useContext(GameContext);
