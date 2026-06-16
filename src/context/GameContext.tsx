@@ -1,6 +1,6 @@
 "use client";
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
-import { db } from "@/lib/firebase-client"; // Imports from the NEW file we just created
+import { db } from "@/lib/firebase-client";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -8,17 +8,14 @@ type Match = any;
 type Prediction = any;
 
 function calculatePoints(pred: any, match: any): number | null {
-  // FIX: Return null if scores aren't ready (Pending)
   if (match.home_score == null || match.away_score == null) return null;
   if (pred.home_score == null || pred.away_score == null) return null;
-
   if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
   const predOutcome = pred.home_score > pred.away_score ? "home" : pred.home_score < pred.away_score ? "away" : "draw";
   const actOutcome = match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
-
   if (predOutcome === actOutcome) return 3;
-  return 0; // Miss
+  return 0;
 }
 
 const GameContext = createContext<any>(null);
@@ -35,20 +32,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!db) return;
-    const qMatches = query(collection(db, "matches"), orderBy("order", "asc"));
-    const qPredictions = query(collection(db, "predictions"));
-    const qDoublePicks = query(collection(db, "double_picks"));
-    const qUsers = query(collection(db, "users"));
-    const qRounds = query(collection(db, "rounds"), orderBy("order", "asc"));
-
     const unsubR = [
-      onSnapshot(qMatches, (snap) => setMatches(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(qPredictions, (snap) => setPredictions(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(qDoublePicks, (snap) => setDoublePicks(snap.docs.map(d => d.data()))),
-      onSnapshot(qUsers, (snap) => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(qRounds, (snap) => setRounds(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(query(collection(db, "matches"), orderBy("order", "asc")), (snap) => setMatches(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(query(collection(db, "predictions")), (snap) => {
+        const preds = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        console.log(`📦 [GameContext] Loaded ${preds.length} total predictions`);
+        setPredictions(preds);
+      }),
+      onSnapshot(query(collection(db, "double_picks")), (snap) => setDoublePicks(snap.docs.map(d => d.data()))),
+      onSnapshot(query(collection(db, "users")), (snap) => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(query(collection(db, "rounds"), orderBy("order", "asc")), (snap) => setRounds(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
     ];
-
     setLoading(false);
     return () => unsubR.forEach(u => u());
   }, []);
@@ -78,16 +72,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, [matches, predictions, doublePicks, users]);
 
   const myRounds = useMemo(() => {
-    // FIX: Use 'as any' to prevent TypeErrors if 'id' or 'userId' is missing
     const u = authUser as any;
     const currentUserId = u?.id || u?.userId;
     if (!currentUserId || matches.length === 0) return [];
 
-    const myPreds = predictions.filter(p => p.user_id === currentUserId || p.userId === currentUserId);
-    const predMap = new Map();
-    myPreds.forEach(p => predMap.set(p.match_id || p.matchId, p));
+    const myPreds = predictions.filter(p => (p.user_id || p.userId) === currentUserId);
+    console.log(`🎯 [GameContext] Found ${myPreds.length} predictions for user ${currentUserId}`);
 
-    const myDoubles = doublePicks.filter(d => d.user_id === currentUserId || d.userId === currentUserId);
+    const predMap = new Map();
+    myPreds.forEach(p => {
+      const mId = p.match_id || p.matchId;
+      if (mId) predMap.set(mId, p);
+    });
+
+    const myDoubles = doublePicks.filter(d => (d.user_id || d.userId) === currentUserId);
     const doubleSet = new Set(myDoubles.map(d => d.match_id || d.matchId));
 
     return rounds.map((round: any) => ({
@@ -95,7 +93,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       name: round.name,
       status: round.status,
       matches: matches
-        .filter(m => m.round_id === round.id || m.roundId === round.id)
+        .filter(m => (m.round_id || m.roundId) === round.id)
         .map(match => {
           const pred = predMap.get(match.id);
           const isDoubled = doubleSet.has(match.id);
