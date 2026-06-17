@@ -41,64 +41,78 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!db) return;
 
     const unsubR = [
-      onSnapshot(query(collection(db, "matches"), orderBy("order", "asc")), (snap) => setMatches(snap.docs.map((d) => ({ id: d.id, ...d.data() })))),
-      onSnapshot(query(collection(db, "predictions")), (snap) => {
-        const preds = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        console.log(`📦 [Context] Received ${preds.length} predictions from DB.`);
-        setPredictions(preds);
-      }),
-      onSnapshot(query(collection(db, "double_picks")), (snap) => setDoublePicks(snap.docs.map((d) => d.data()))),
-      onSnapshot(query(collection(db, "users")), (snap) => setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })))),
-      onSnapshot(query(collection(db, "rounds"), orderBy("order", "asc")), (snap) => setRounds(snap.docs.map((d) => ({ id: d.id, ...d.data() })))),
+      // Initial sort by 'order', but we re-sort by date in the 'myRounds' useMemo below
+      onSnapshot(query(collection(db, "matches"), orderBy("order", "asc")), (snap) =>
+        setMatches(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      ),
+      onSnapshot(query(collection(db, "predictions")), (snap) =>
+        setPredictions(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      ),
+      onSnapshot(query(collection(db, "double_picks")), (snap) =>
+        setDoublePicks(snap.docs.map((d) => d.data()))
+      ),
+      onSnapshot(query(collection(db, "users")), (snap) =>
+        setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      ),
+      onSnapshot(query(collection(db, "rounds"), orderBy("order", "asc")), (snap) =>
+        setRounds(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      ),
     ];
 
     setLoading(false);
     return () => unsubR.forEach((u) => u());
   }, []);
 
-  // 2. Compute Current User's View (With Debug Logs)
+  // 2. Compute Current User's View (Sorted by Date)
   const myRounds = useMemo(() => {
-    // FIX: Aggressively find the User ID
     const u = authUser as any;
-    // Try all common ID fields
     const currentUserId = u?.id || u?.userId || u?.uid;
-
-    console.log(`🔍 [Debug] Current User ID: ${currentUserId}`);
-    console.log(`🔍 [Debug] Total Predictions in Memory: ${predictions.length}`);
 
     if (!currentUserId || matches.length === 0) return [];
 
-    // Filter predictions robustly (check both 'user_id' and 'userId' fields)
+    // Filter predictions robustly
     const myPreds = predictions.filter((p) => {
       const pUid = p.user_id || p.userId;
       return String(pUid) === String(currentUserId);
     });
 
-    console.log(`✅ [Debug] Found ${myPreds.length} predictions for User ${currentUserId}`);
-
-    // Map predictions by Match ID
     const predMap = new Map();
     myPreds.forEach((p) => {
-      // Check both 'match_id' and 'matchId'
       const mId = p.match_id || p.matchId;
-      if (mId) {
-        console.log(`   ↳ Mapped Match ID: ${mId}`);
-        predMap.set(mId, p);
-      }
+      if (mId) predMap.set(mId, p);
     });
 
-    // Map double picks
     const myDoubles = doublePicks.filter((d) => String(d.user_id || d.userId) === String(currentUserId));
     const doubleSet = new Set(myDoubles.map((d) => d.match_id || d.matchId));
 
-    return rounds.map((round: any) => ({
-      id: round.id,
-      name: round.name,
-      status: round.status,
-      matches: matches
-        .filter((m) => (m.round_id || m.roundId) === round.id)
-        .map((match) => {
-          // FIX: Ensure we look up by match.id (Firestore Doc ID)
+    return rounds.map((round: any) => {
+      // 1. Filter matches for this round
+      const roundMatches = matches.filter((m: any) => (m.round_id || m.roundId) === round.id);
+
+      // 2. SORT matches by date/time (Chronological)
+      roundMatches.sort((a: any, b: any) => {
+        // Helper to safely parse Firestore Timestamps or Strings
+        const parseDate = (raw: any) => {
+          if (!raw) return 0;
+          // If it's a Firestore Timestamp object, convert to Date
+          const dateObj = raw.toDate ? raw.toDate() : new Date(raw);
+          return dateObj.getTime();
+        };
+
+        const dateA = parseDate(a.match_date || a.matchDate);
+        const dateB = parseDate(b.match_date || b.matchDate);
+
+        if (isNaN(dateA)) return 1; // Invalid dates go to the end
+        if (isNaN(dateB)) return -1;
+        return dateA - dateB;
+      });
+
+      // 3. Map to final structure
+      return {
+        id: round.id,
+        name: round.name,
+        status: round.status,
+        matches: roundMatches.map((match: any) => {
           const pred = predMap.get(match.id);
           const isDoubled = doubleSet.has(match.id);
 
@@ -108,15 +122,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             if (points !== null && isDoubled) points *= 2;
           }
 
+          // Ensure matchDate is a valid string or Date object for the UI
+          const safeDate = match.match_date?.toDate ? match.match_date.toDate() : (match.match_date || match.matchDate);
+
           return {
             id: match.id,
             homeTeam: match.home_team || match.homeTeam || "TBD",
             awayTeam: match.away_team || match.awayTeam || "TBD",
-            matchDate: match.match_date || match.matchDate,
+            matchDate: safeDate, // The sorted date
             homeScore: match.home_score ?? null,
             awayScore: match.away_score ?? null,
             isLive: match.is_live ?? false,
-            // This is the key: if pred is null, the UI won't show your input
             prediction: pred
               ? { homeScore: pred.home_score, awayScore: pred.away_score }
               : null,
@@ -124,7 +140,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             points,
           };
         }),
-    }));
+      };
+    });
   }, [matches, predictions, doublePicks, rounds, authUser]);
 
   // 3. Compute Leaderboard
@@ -154,7 +171,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return Object.values(userScores).sort((a: any, b: any) => b.totalPoints - a.totalPoints);
   }, [matches, predictions, doublePicks, users]);
 
-  return <GameContext.Provider value={{ leaderboard, myRounds, loading: loading || authLoading }}>{children}</GameContext.Provider>;
+  return (
+    <GameContext.Provider value={{ leaderboard, myRounds, loading: loading || authLoading }}>
+      {children}
+    </GameContext.Provider>
+  );
 }
 
 export const useGameContext = () => useContext(GameContext);
