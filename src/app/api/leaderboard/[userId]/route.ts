@@ -3,11 +3,11 @@ import { db } from "@/lib/firebase";
 
 export const dynamic = "force-dynamic";
 
-// FIX: Updated types to accept null values from Firestore
+// FIX: Explicitly define return type as number | null
 function calculatePoints(
   pred: { home_score?: number | null; away_score?: number | null },
   match: { home_score?: number | null; away_score?: number | null }
-) {
+): number | null {
   // If match or prediction score is missing, return null (Pending)
   if (match.home_score == null || match.away_score == null) return null;
   if (pred.home_score == null || pred.away_score == null) return null;
@@ -96,11 +96,11 @@ export async function GET(
           const pred = predsMap.get(matchId);
           const isDoubled = doubleSet.has(matchId);
 
-          let points = null;
-          let basePoints = 0;
+          let points: number | null = null;
+          // FIX: Initialize as number | null
+          let basePoints: number | null = null; 
 
           if (pred) {
-            // FIX: Pass values directly (even if null) to calculatePoints
             basePoints = calculatePoints({ 
               home_score: pred.home_score, 
               away_score: pred.away_score 
