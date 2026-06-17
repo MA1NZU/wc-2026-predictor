@@ -8,11 +8,9 @@ function calculatePoints(
   pred: { home_score?: number | null; away_score?: number | null },
   match: { home_score?: number | null; away_score?: number | null }
 ): number | null {
-  // If match or prediction score is missing, return null (Pending)
   if (match.home_score == null || match.away_score == null) return null;
   if (pred.home_score == null || pred.away_score == null) return null;
 
-  // Exact score match = 6 pts
   if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
   const predOutcome =
@@ -20,9 +18,7 @@ function calculatePoints(
   const actOutcome =
     match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
 
-  // Correct outcome = 3 pts
   if (predOutcome === actOutcome) return 3;
-  
   return 0;
 }
 
@@ -49,15 +45,11 @@ export async function GET(
 
     // 4. Fetch Predictions
     let predSnap = await db.collection("predictions").where("user_id", "==", userId).get();
-    if (predSnap.empty) {
-      predSnap = await db.collection("predictions").where("userId", "==", userId).get();
-    }
+    if (predSnap.empty) predSnap = await db.collection("predictions").where("userId", "==", userId).get();
 
     // 5. Fetch Double Picks
     let doubleSnap = await db.collection("double_picks").where("user_id", "==", userId).get();
-    if (doubleSnap.empty) {
-      doubleSnap = await db.collection("double_picks").where("userId", "==", userId).get();
-    }
+    if (doubleSnap.empty) doubleSnap = await db.collection("double_picks").where("userId", "==", userId).get();
 
     // --- Data Processing ---
     const matchesMap = new Map<string, any>();
@@ -84,11 +76,13 @@ export async function GET(
       const roundData = roundDoc.data() as any;
       const roundId = roundDoc.id;
 
-      // Find matches belonging to this round
+      // FIX: Robust filter that handles Reference objects, strings, and different field names
       const roundMatches = matchesSnap.docs
         .filter((matchDoc) => {
           const mData = matchDoc.data() as any;
-          return (mData.round_id || mData.roundId) === roundId;
+          // Try to get round ID from Reference object (.id) or direct string field
+          const mRoundId = mData.round_id?.id || mData.round_id || mData.roundId;
+          return String(mRoundId) === String(roundId);
         })
         .map((matchDoc) => {
           const matchData = matchDoc.data() as any;
@@ -97,15 +91,14 @@ export async function GET(
           const isDoubled = doubleSet.has(matchId);
 
           let points: number | null = null;
-          // FIX: Initialize as number | null
-          let basePoints: number | null = null; 
+          let basePoints: number | null = null;
 
           if (pred) {
-            basePoints = calculatePoints({ 
-              home_score: pred.home_score, 
-              away_score: pred.away_score 
-            }, matchData);
-            
+            basePoints = calculatePoints(
+              { home_score: pred.home_score, away_score: pred.away_score },
+              matchData
+            );
+
             if (basePoints !== null) {
               points = basePoints * (isDoubled ? 2 : 1);
               totalPoints += points;
@@ -120,9 +113,7 @@ export async function GET(
             homeScore: matchData.home_score ?? null,
             awayScore: matchData.away_score ?? null,
             isLive: matchData.is_live ?? false,
-            prediction: pred
-              ? { homeScore: pred.home_score, awayScore: pred.away_score }
-              : null,
+            prediction: pred ? { homeScore: pred.home_score, awayScore: pred.away_score } : null,
             doublePick: isDoubled,
             points,
             basePoints,
@@ -143,7 +134,6 @@ export async function GET(
       };
     });
 
-    // Add bonus points
     totalPoints += user.bonusPoints || 0;
 
     return NextResponse.json({
@@ -151,7 +141,6 @@ export async function GET(
       totalPoints,
       rounds: roundsWithMatches,
     });
-
   } catch (error) {
     console.error(">>> [PLAYER DETAILS ERROR]", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
