@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useGameContext } from "@/context/GameContext"; // Import shared context
+import { useGameContext } from "@/context/GameContext";
 import { Trophy, Medal, Loader2, Crown, X, Swords, Zap, Star } from "lucide-react";
 
 // --- Types ---
-type PredictionDetail = {
+// Updated to match the new API structure (Rounds containing Matches)
+type MatchPrediction = {
   id: string;
   matchId: string;
   homeTeam: string;
@@ -22,63 +23,31 @@ type PredictionDetail = {
   hasScore: boolean;
 };
 
+type Round = {
+  id: string;
+  name: string;
+  status: string;
+  matches: MatchPrediction[];
+};
+
 type UserDetail = {
   user: { id: string; username: string };
   totalPoints: number;
-  predictionsCount: number; // Kept for API response compatibility, even if not displayed
-  predictions: PredictionDetail[];
+  predictionsCount: number;
+  rounds: Round[]; // The API now returns rounds instead of flat predictions
 };
 
 // --- Helpers ---
 function getFlag(team: string) {
   if (!team) return "🏳️";
   const flags: Record<string, string> = {
-     FRANCE: "🇫🇷", GERMANY: "🇩🇪", ENGLAND: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SPAIN: "🇪🇸", PORTUGAL: "🇵🇹",
+    FRANCE: "🇫🇷", GERMANY: "🇩🇪", ENGLAND: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SPAIN: "🇪🇸", PORTUGAL: "🇵🇹",
     NETHERLANDS: "🇳🇱", BELGIUM: "🇧🇪", ITALY: "🇮🇹", CROATIA: "🇭🇷", DENMARK: "🇩🇰",
     SWITZERLAND: "🇨🇭", POLAND: "🇵🇱", WALES: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", SCOTLAND: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", UKRAINE: "🇺🇦",
     AUSTRIA: "🇦🇹", SERBIA: "🇷🇸", SWEDEN: "🇸🇪", NORWAY: "🇳🇴", CZECHIA: "🇨🇿",
-    CZECH: "🇨🇿", HUNGARY: "🇭🇺", ROMANIA: "🇷🇴", SLOVAKIA: "🇸🇰", SLOVENIA: "🇸🇮",
-    GREECE: "🇬🇷", TURKEY: "🇹🇷", IRELAND: "🇮🇪", NORTHERN: "🇬🇧", BOSNIA: "🇧🇦",
-    FINLAND: "🇫🇮", RUSSIA: "🇷🇺", "SOUTH AFRICA": "🇿🇦", "TURKIYE": "🇹🇷", "SOUTH KOREA": "🇰🇷", "IVORY COAST": "🇨🇮", "CAPE VERDE": "🇨🇻", "SAUDI ARABIA": "🇸🇦", "DR CONGO": "🇨🇬",
-
-    /* ---------- CONMEBOL (6) ---------- */
     ARGENTINA: "🇦🇷", BRAZIL: "🇧🇷", URUGUAY: "🇺🇾", COLOMBIA: "🇨🇴", ECUADOR: "🇪🇨",
-    CHILE: "🇨🇱", PERU: "🇵🇪", PARAGUAY: "🇵🇾", BOLIVIA: "🇧🇴", VENEZUELA: "🇻🇪", 
-
-    /* ---------- CONCACAF (9 incl. 3 hosts) ---------- */
-    USA: "🇺🇸", CANADA: "🇨🇦", MEXICO: "🇲🇽", PANAMA: "🇵🇦", COSTA: "🇨🇷",
-    RICA: "🇨🇷", HONDURAS: "🇭🇳", JAMAICA: "🇯🇲", EL: "🇸🇻", SALVADOR: "🇸🇻",
-    GUATEMALA: "🇬🇹", HAITI: "🇭🇹", TRINIDAD: "🇹🇹", CUBA: "🇨🇺", CURACAO: "🇨🇼",
-    NICARAGUA: "🇳🇮", BERMUDA: "🇧🇲",
-
-    /* ---------- CAF (9) ---------- */
-    MOROCCO: "🇲🇦", EGYPT: "🇪🇬", SENEGAL: "🇸🇳", TUNISIA: "🇹🇳", ALGERIA: "🇩🇿",
-    NIGERIA: "🇳🇬", CAMEROON: "🇨🇲", GHANA: "🇬🇭", IVORY: "🇨🇮", COTE: "🇨🇮",
-    "CÔTE D'IVOIRE": "🇨🇮", MALI: "🇲🇱", BURKINA: "🇧🇫", SOUTH: "🇿🇦", KENYA: "🇰🇪",
-    ZAMBIA: "🇿🇲", DR: "🇨🇩", CONGO: "🇨🇬", ANGOLA: "🇦🇴", TANZANIA: "🇹🇿",
-    UGANDA: "🇺🇬", GABON: "🇬🇦", MOZAMBIQUE: "🇲🇿", MADAGASCAR: "🇲🇬", LIBERIA: "🇱🇷",
-    TOGO: "🇹🇬", SUDAN: "🇸🇩", MAURITANIA: "🇲🇷", LIBYA: "🇱🇾", GUINEA: "🇬🇳",
-    NAMIBIA: "🇳🇦", BENIN: "🇧🇯", RWANDA: "🇷🇼", MALAWI: "🇲🇼", ZIMBABWE: "🇿🇼",
-    SIERRA: "🇸🇱", BOTSWANA: "🇧🇼", ESWATINI: "🇸🇿", LESOTHO: "🇱🇸", COMOROS: "🇰🇲",
-    CHAD: "🇹🇩", ERITREA: "🇪🇷", DJIBOUTI: "🇩🇯", CENTRAL: "🇨🇫", EQUATORIAL: "🇬🇶",
-    SAO: "🇸🇹", CAPE: "🇨🇻", SEYCHELLES: "🇸🇨", MAURITIUS: "🇲🇺", BURUNDI: "🇧🇮",
-    SOMALIA: "🇸🇴", SOUTHSUDAN: "🇸🇸", "SOUTH SUDAN": "🇸🇸",
-
-    /* ---------- AFC (8) ---------- */
-    JAPAN: "🇯🇵", KOREA: "🇰🇷", AUSTRALIA: "🇦🇺", IRAN: "🇮🇷", SAUDI: "🇸🇦",
-    ARABIA: "🇸🇦", QATAR: "🇶🇦", IRAQ: "🇮🇶", UZBEKISTAN: "🇺🇿", JORDAN: "🇯🇴",
-    UAE: "🇦🇪", BAHRAIN: "🇧🇭", CHINA: "🇨🇳", THAILAND: "🇹🇭", INDONESIA: "🇮🇩",
-    SYRIA: "🇸🇾", OMAN: "🇴🇲", INDIA: "🇮🇳", LEBANON: "🇱🇧", VIETNAM: "🇻🇳",
-    TAJIKISTAN: "🇹🇯", KUWAIT: "🇰🇼", PALESTINE: "🇵🇸", MALAYSIA: "🇲🇾", SINGAPORE: "🇸🇬",
-    KYRGYZSTAN: "🇰🇬", MONGOLIA: "🇲🇳", TURKMENISTAN: "🇹🇲", HONG: "🇭🇰", TAIWAN: "🇹🇼",
-    MACAU: "🇲🇴", YEMEN: "🇾🇪", AFGHANISTAN: "🇦🇫", BANGLADESH: "🇧🇩", NEPAL: "🇳🇵",
-    PAKISTAN: "🇵🇰", SRI: "🇱🇰", BHUTAN: "🇧🇹", MALDIVES: "🇲🇻", GUAM: "🇬🇺",
-    CAMBODIA: "🇰🇭", LAOS: "🇱🇦", MYANMAR: "🇲🇲", BRUNEI: "🇧🇳", PHILIPPINES: "🇵🇭",
-    NORTH: "🇰🇵",
-
-    /* ---------- OFC (1) ---------- */
-    "NEW ZEALAND": "🇳🇿", FIJI: "🇫🇯", PAPUA: "🇵🇬", NEWCALEDONIA: "🇳🇨", TAHITI: "🇵🇫",
-    SAMOA: "🇼🇸", VANUATU: "🇻🇺", SOLOMON: "🇸🇧",
+    USA: "🇺🇸", CANADA: "🇨🇦", MEXICO: "🇲🇽", JAPAN: "🇯🇵", KOREA: "🇰🇷", AUSTRALIA: "🇦🇺",
+    MOROCCO: "🇲🇦", EGYPT: "🇪🇬", SENEGAL: "🇸🇳", NIGERIA: "🇳🇬", "NEW ZEALAND": "🇳🇿",
   };
   const upper = team.toUpperCase().trim();
   return flags[upper] || flags[upper.slice(0, 3)] || "🏳️";
@@ -106,17 +75,18 @@ function getPointsLabel(points: number | null, isDoubled: boolean) {
 }
 
 export default function LeaderboardPage() {
-  // FIX: Use Context for real-time leaderboard data instead of polling
   const { leaderboard, loading: loadingContext } = useGameContext();
-  
-  // Local state only for the modal details
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  // State for the active tab (0 is the first round)
+  const [activeRoundIndex, setActiveRoundIndex] = useState(0);
 
   const openUserDetail = async (userId: string) => {
     setLoadingDetail(true);
-    setSelectedUser(null); // Reset previous
+    setSelectedUser(null);
+    setActiveRoundIndex(0); // Reset tab to first round
     try {
+      // Fetch the new structure (rounds array)
       const res = await fetch(`/api/leaderboard/${userId}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
@@ -180,7 +150,6 @@ export default function LeaderboardPage() {
                 >
                   {user.username}
                 </button>
-                {/* Removed predictionsCount as requested */}
               </div>
               <div className="text-right font-bold text-lg text-wc-gold">
                 {user.totalPoints}
@@ -202,7 +171,7 @@ export default function LeaderboardPage() {
           onClick={() => setSelectedUser(null)}
         >
           <div
-            className="bg-wc-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
+            className="bg-wc-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -213,10 +182,7 @@ export default function LeaderboardPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold">{selectedUser.user.username}</h2>
-                  {/* Removed predictionsCount here too */}
-                  <p className="text-xs text-white/40">
-                    {selectedUser.totalPoints} pts
-                  </p>
+                  <p className="text-xs text-white/40">Total Points: {selectedUser.totalPoints}</p>
                 </div>
               </div>
               <button
@@ -227,16 +193,37 @@ export default function LeaderboardPage() {
               </button>
             </div>
 
-            {/* Modal Body */}
+            {/* TABS FOR ROUNDS/WEEKS */}
+            <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-white/5 scrollbar-hide">
+              {selectedUser.rounds?.map((round, index) => {
+                const isActive = index === activeRoundIndex;
+                return (
+                  <button
+                    key={round.id}
+                    onClick={() => setActiveRoundIndex(index)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                      isActive
+                        ? "bg-wc-gold text-black"
+                        : "bg-white/5 text-white/50 hover:bg-white/10"
+                    }`}
+                  >
+                    {round.name}
+                  </button>
+                );
+              })}
+              {(!selectedUser.rounds || selectedUser.rounds.length === 0) && (
+                <span className="text-xs text-white/30">No rounds available</span>
+              )}
+            </div>
+
+            {/* Modal Body (Matches for selected round) */}
             <div className="overflow-y-auto p-4 sm:p-5 space-y-3">
               {loadingDetail ? (
                 <div className="flex items-center justify-center py-12 text-white/30">
                   <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...
                 </div>
-              ) : selectedUser.predictions.length === 0 ? (
-                <div className="text-center py-12 text-white/30">No predictions yet</div>
               ) : (
-                selectedUser.predictions.map((pred) => {
+                selectedUser.rounds?.[activeRoundIndex]?.matches.map((pred) => {
                   const pointsMeta = getPointsLabel(pred.points, pred.isDoubled);
                   
                   return (
@@ -262,10 +249,7 @@ export default function LeaderboardPage() {
                           )}
                           {pred.isLive && (
                             <span className="px-1.5 py-0.5 rounded bg-wc-red/10 text-wc-red text-[10px] font-bold flex items-center gap-1">
-                              <span className="relative flex h-1.5 w-1.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-wc-red opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-wc-red"></span>
-                              </span>
+                              <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-wc-red opacity-75"></span><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-wc-red"></span></span>
                               LIVE
                             </span>
                           )}
@@ -273,7 +257,6 @@ export default function LeaderboardPage() {
                       </div>
 
                       <div className="flex items-center justify-between gap-3">
-                        {/* Teams */}
                         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                           <div className="flex-1 flex items-center gap-2 min-w-0">
                             <span className="text-lg">{getFlag(pred.homeTeam)}</span>
@@ -286,7 +269,6 @@ export default function LeaderboardPage() {
                           </div>
                         </div>
 
-                        {/* Predictions & Points */}
                         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                           {pred.hasScore ? (
                             <div className="flex items-center gap-2">
@@ -323,6 +305,9 @@ export default function LeaderboardPage() {
                     </div>
                   );
                 })
+              )}
+              {(!selectedUser.rounds || selectedUser.rounds.length === 0 || !selectedUser.rounds[activeRoundIndex]?.matches.length) && (
+                <div className="text-center py-12 text-white/30">No predictions found for this round.</div>
               )}
             </div>
           </div>
