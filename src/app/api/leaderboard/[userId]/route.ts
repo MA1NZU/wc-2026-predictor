@@ -76,11 +76,9 @@ export async function GET(
       const roundData = roundDoc.data() as any;
       const roundId = roundDoc.id;
 
-      // FIX: Robust filter that handles Reference objects, strings, and different field names
       const roundMatches = matchesSnap.docs
         .filter((matchDoc) => {
           const mData = matchDoc.data() as any;
-          // Try to get round ID from Reference object (.id) or direct string field
           const mRoundId = mData.round_id?.id || mData.round_id || mData.roundId;
           return String(mRoundId) === String(roundId);
         })
@@ -113,7 +111,9 @@ export async function GET(
             homeScore: matchData.home_score ?? null,
             awayScore: matchData.away_score ?? null,
             isLive: matchData.is_live ?? false,
-            prediction: pred ? { homeScore: pred.home_score, awayScore: pred.away_score } : null,
+            // FIX: Return flat fields for frontend
+            predictedHome: pred ? pred.home_score : null,
+            predictedAway: pred ? pred.away_score : null,
             doublePick: isDoubled,
             points,
             basePoints,
@@ -121,7 +121,6 @@ export async function GET(
           };
         });
 
-      // Sort matches within the round by date
       roundMatches.sort(
         (a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
       );
