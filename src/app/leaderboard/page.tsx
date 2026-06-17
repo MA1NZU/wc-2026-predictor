@@ -14,8 +14,9 @@ type MatchPrediction = {
   homeScore: number | null;
   awayScore: number | null;
   isLive: boolean;
-  predictedHome: number;
-  predictedAway: number;
+  // These are now flat in the API response
+  predictedHome: number | null;
+  predictedAway: number | null;
   isDoubled: boolean;
   basePoints: number | null;
   points: number | null;
@@ -126,7 +127,6 @@ export default function LeaderboardPage() {
       const res = await fetch(`/api/leaderboard/${userId}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        console.log(">>> [DEBUG] User Data Loaded:", data); // Check this in browser console
         setSelectedUser(data);
       }
     } catch (error) {
@@ -207,11 +207,12 @@ export default function LeaderboardPage() {
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
           onClick={() => setSelectedUser(null)}
         >
+          {/* FIX: Use flex layout to fix double scrollbars */}
           <div
-            className="bg-wc-dark border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            className="bg-wc-dark border border-white/10 rounded-2xl w-full max-w-lg h-[85vh] flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
+            {/* Modal Header (Shrink 0) */}
             <div className="px-5 sm:px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-wc-gold/20 flex items-center justify-center">
@@ -230,16 +231,16 @@ export default function LeaderboardPage() {
               </button>
             </div>
 
-            {/* TABS FOR ROUNDS/WEEKS (FIXED HEIGHT) */}
-            <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-white/5 scrollbar-hide">
+            {/* TABS (Shrink 0) */}
+            <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-white/5 scrollbar-hide shrink-0">
               {selectedUser.rounds?.map((round, index) => {
                 const isActive = index === activeRoundIndex;
                 return (
                   <button
                     key={round.id}
                     onClick={() => setActiveRoundIndex(index)}
-                    // FIX: Increased padding (py-2.5) and font size (text-sm)
-                    className={`px-4 py-2.5 rounded-lg text-sm font-bold transition whitespace-nowrap ${
+                    // FIX: Increased padding, whitespace-nowrap, flex-none
+                    className={`px-5 py-2.5 rounded-lg text-sm font-bold transition whitespace-nowrap flex-none ${
                       isActive
                         ? "bg-wc-gold text-black shadow-lg"
                         : "bg-white/5 text-white/50 hover:bg-white/10"
@@ -249,13 +250,10 @@ export default function LeaderboardPage() {
                   </button>
                 );
               })}
-              {(!selectedUser.rounds || selectedUser.rounds.length === 0) && (
-                <span className="text-xs text-white/30 px-4 py-2.5">No rounds available</span>
-              )}
             </div>
 
-            {/* Modal Body */}
-            <div className="overflow-y-auto p-4 sm:p-5 space-y-3">
+            {/* Modal Body (Flex 1, min-h-0 to allow scrolling inside) */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 min-h-0">
               {loadingDetail ? (
                 <div className="flex items-center justify-center py-12 text-white/30">
                   <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...
@@ -269,9 +267,6 @@ export default function LeaderboardPage() {
                      return (
                        <div className="text-center py-12 text-white/30">
                          <p className="text-lg font-bold text-white/50">No matches found</p>
-                         <p className="text-xs mt-2 text-white/20">
-                           Round: {currentRound?.name || "Unknown"}
-                         </p>
                        </div>
                      );
                   }
@@ -327,8 +322,9 @@ export default function LeaderboardPage() {
                                 <div className="text-white/10">|</div>
                                 <div className="text-center">
                                   <div className="text-xs text-white/30">Predicted</div>
+                                  {/* FIX: Use the flat predictedHome/away fields */}
                                   <div className="font-bold text-sm text-wc-gold">
-                                    {pred.predictedHome} - {pred.predictedAway}
+                                    {pred.predictedHome ?? "-"} - {pred.predictedAway ?? "-"}
                                   </div>
                                 </div>
                               </div>
@@ -336,7 +332,7 @@ export default function LeaderboardPage() {
                               <div className="text-center">
                                 <div className="text-xs text-white/30">Predicted</div>
                                 <div className="font-bold text-sm text-wc-gold">
-                                  {pred.predictedHome} - {pred.predictedAway}
+                                  {pred.predictedHome ?? "-"} - {pred.predictedAway ?? "-"}
                                 </div>
                               </div>
                             )}
