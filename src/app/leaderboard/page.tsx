@@ -5,7 +5,6 @@ import { useGameContext } from "@/context/GameContext";
 import { Trophy, Medal, Loader2, Crown, X, Swords, Zap, Star } from "lucide-react";
 
 // --- Types ---
-// Updated to match the new API structure (Rounds containing Matches)
 type MatchPrediction = {
   id: string;
   matchId: string;
@@ -34,7 +33,7 @@ type UserDetail = {
   user: { id: string; username: string };
   totalPoints: number;
   predictionsCount: number;
-  rounds: Round[]; // The API now returns rounds instead of flat predictions
+  rounds: Round[];
 };
 
 // --- Helpers ---
@@ -102,7 +101,7 @@ function formatDate(dateStr: string) {
 }
 
 function getPointsLabel(points: number | null, isDoubled: boolean) {
-  if (points === null) return null; // Pending
+  if (points === null) return null;
   if (points === 0) return { text: "Miss", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
   if (isDoubled) {
     if (points === 12) return { text: "Perfect 2x", color: "text-wc-gold", bg: "bg-wc-gold/20", border: "border-wc-gold/30" };
@@ -117,18 +116,17 @@ export default function LeaderboardPage() {
   const { leaderboard, loading: loadingContext } = useGameContext();
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  // State for the active tab (0 is the first round)
   const [activeRoundIndex, setActiveRoundIndex] = useState(0);
 
   const openUserDetail = async (userId: string) => {
     setLoadingDetail(true);
     setSelectedUser(null);
-    setActiveRoundIndex(0); // Reset tab to first round
+    setActiveRoundIndex(0);
     try {
-      // Fetch the new structure (rounds array)
       const res = await fetch(`/api/leaderboard/${userId}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
+        console.log(">>> [DEBUG] User Data Loaded:", data); // Check this in browser console
         setSelectedUser(data);
       }
     } catch (error) {
@@ -232,7 +230,7 @@ export default function LeaderboardPage() {
               </button>
             </div>
 
-            {/* TABS FOR ROUNDS/WEEKS */}
+            {/* TABS FOR ROUNDS/WEEKS (FIXED HEIGHT) */}
             <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-white/5 scrollbar-hide">
               {selectedUser.rounds?.map((round, index) => {
                 const isActive = index === activeRoundIndex;
@@ -240,9 +238,10 @@ export default function LeaderboardPage() {
                   <button
                     key={round.id}
                     onClick={() => setActiveRoundIndex(index)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                    // FIX: Increased padding (py-2.5) and font size (text-sm)
+                    className={`px-4 py-2.5 rounded-lg text-sm font-bold transition whitespace-nowrap ${
                       isActive
-                        ? "bg-wc-gold text-black"
+                        ? "bg-wc-gold text-black shadow-lg"
                         : "bg-white/5 text-white/50 hover:bg-white/10"
                     }`}
                   >
@@ -251,102 +250,108 @@ export default function LeaderboardPage() {
                 );
               })}
               {(!selectedUser.rounds || selectedUser.rounds.length === 0) && (
-                <span className="text-xs text-white/30">No rounds available</span>
+                <span className="text-xs text-white/30 px-4 py-2.5">No rounds available</span>
               )}
             </div>
 
-            {/* Modal Body (Matches for selected round) */}
+            {/* Modal Body */}
             <div className="overflow-y-auto p-4 sm:p-5 space-y-3">
               {loadingDetail ? (
                 <div className="flex items-center justify-center py-12 text-white/30">
                   <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...
                 </div>
               ) : (
-                selectedUser.rounds?.[activeRoundIndex]?.matches.map((pred) => {
-                  const pointsMeta = getPointsLabel(pred.points, pred.isDoubled);
-                  
-                  return (
-                    <div
-                      key={pred.id}
-                      className={`rounded-xl border p-4 transition ${
-                        pred.points !== null && pred.points > 0
-                          ? "bg-white/[0.02] border-wc-gold/10"
-                          : pred.points !== null && pred.points === 0
-                          ? "bg-white/[0.02] border-red-500/10"
-                          : "bg-white/[0.02] border-white/5"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-[10px] sm:text-xs text-white/30 uppercase tracking-wider font-semibold">
-                          {formatDate(pred.matchDate)}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {pred.isDoubled && (
-                            <span className="px-1.5 py-0.5 rounded bg-wc-gold/10 text-wc-gold text-[10px] font-bold flex items-center gap-1">
-                              <Zap className="w-3 h-3 fill-wc-gold" /> 2x
-                            </span>
-                          )}
-                          {pred.isLive && (
-                            <span className="px-1.5 py-0.5 rounded bg-wc-red/10 text-wc-red text-[10px] font-bold flex items-center gap-1">
-                              <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-wc-red opacity-75"></span><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-wc-red"></span></span>
-                              LIVE
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                (() => {
+                  const currentRound = selectedUser.rounds?.[activeRoundIndex];
+                  const currentMatches = currentRound?.matches;
 
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                          <div className="flex-1 flex items-center gap-2 min-w-0">
-                            <span className="text-lg">{getFlag(pred.homeTeam)}</span>
-                            <span className="font-bold text-sm truncate">{pred.homeTeam}</span>
+                  if (!currentMatches || currentMatches.length === 0) {
+                     return (
+                       <div className="text-center py-12 text-white/30">
+                         <p className="text-lg font-bold text-white/50">No matches found</p>
+                         <p className="text-xs mt-2 text-white/20">
+                           Round: {currentRound?.name || "Unknown"}
+                         </p>
+                       </div>
+                     );
+                  }
+
+                  return currentMatches.map((pred) => {
+                    const pointsMeta = getPointsLabel(pred.points, pred.isDoubled);
+                    return (
+                      <div
+                        key={pred.id}
+                        className={`rounded-xl border p-4 transition ${
+                          pred.points !== null && pred.points > 0
+                            ? "bg-white/[0.02] border-wc-gold/10"
+                            : pred.points !== null && pred.points === 0
+                            ? "bg-white/[0.02] border-red-500/10"
+                            : "bg-white/[0.02] border-white/5"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-[10px] sm:text-xs text-white/30 uppercase tracking-wider font-semibold">
+                            {formatDate(pred.matchDate)}
                           </div>
-                          <div className="text-xs font-bold text-white/20 shrink-0">VS</div>
-                          <div className="flex-1 flex items-center gap-2 min-w-0 flex-row-reverse text-right">
-                            <span className="text-lg">{getFlag(pred.awayTeam)}</span>
-                            <span className="font-bold text-sm truncate">{pred.awayTeam}</span>
+                          <div className="flex items-center gap-2">
+                            {pred.isDoubled && (
+                              <span className="px-1.5 py-0.5 rounded bg-wc-gold/10 text-wc-gold text-[10px] font-bold flex items-center gap-1">
+                                <Zap className="w-3 h-3 fill-wc-gold" /> 2x
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                          {pred.hasScore ? (
-                            <div className="flex items-center gap-2">
-                              <div className="text-center">
-                                <div className="text-xs text-white/30">Actual</div>
-                                <div className="font-bold text-sm">
-                                  {pred.homeScore} - {pred.awayScore}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            <div className="flex-1 flex items-center gap-2 min-w-0">
+                              <span className="text-lg">{getFlag(pred.homeTeam)}</span>
+                              <span className="font-bold text-sm truncate">{pred.homeTeam}</span>
+                            </div>
+                            <div className="text-xs font-bold text-white/20 shrink-0">VS</div>
+                            <div className="flex-1 flex items-center gap-2 min-w-0 flex-row-reverse text-right">
+                              <span className="text-lg">{getFlag(pred.awayTeam)}</span>
+                              <span className="font-bold text-sm truncate">{pred.awayTeam}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                            {pred.hasScore ? (
+                              <div className="flex items-center gap-2">
+                                <div className="text-center">
+                                  <div className="text-xs text-white/30">Actual</div>
+                                  <div className="font-bold text-sm">
+                                    {pred.homeScore} - {pred.awayScore}
+                                  </div>
+                                </div>
+                                <div className="text-white/10">|</div>
+                                <div className="text-center">
+                                  <div className="text-xs text-white/30">Predicted</div>
+                                  <div className="font-bold text-sm text-wc-gold">
+                                    {pred.predictedHome} - {pred.predictedAway}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="text-white/10">|</div>
+                            ) : (
                               <div className="text-center">
                                 <div className="text-xs text-white/30">Predicted</div>
                                 <div className="font-bold text-sm text-wc-gold">
                                   {pred.predictedHome} - {pred.predictedAway}
                                 </div>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="text-center">
-                              <div className="text-xs text-white/30">Predicted</div>
-                              <div className="font-bold text-sm text-wc-gold">
-                                {pred.predictedHome} - {pred.predictedAway}
+                            )}
+                            {pointsMeta && (
+                              <div className={`px-3 py-1.5 rounded-lg border ${pointsMeta.bg} ${pointsMeta.border} text-xs font-bold ${pointsMeta.color} flex items-center gap-1`}>
+                                <Star className="w-3 h-3 fill-current" />
+                                {pointsMeta.text}
                               </div>
-                            </div>
-                          )}
-                          {pointsMeta && (
-                            <div className={`px-3 py-1.5 rounded-lg border ${pointsMeta.bg} ${pointsMeta.border} text-xs font-bold ${pointsMeta.color} flex items-center gap-1`}>
-                              <Star className="w-3 h-3 fill-current" />
-                              {pointsMeta.text}
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-              {(!selectedUser.rounds || selectedUser.rounds.length === 0 || !selectedUser.rounds[activeRoundIndex]?.matches.length) && (
-                <div className="text-center py-12 text-white/30">No predictions found for this round.</div>
+                    );
+                  });
+                })()
               )}
             </div>
           </div>
