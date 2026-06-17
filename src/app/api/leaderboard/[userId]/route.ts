@@ -3,15 +3,16 @@ import { db } from "@/lib/firebase";
 
 export const dynamic = "force-dynamic";
 
-// Helper: Calculate points for a single match
+// FIX: Updated types to accept null values from Firestore
 function calculatePoints(
-  pred: { home_score?: number; away_score?: number },
+  pred: { home_score?: number | null; away_score?: number | null },
   match: { home_score?: number | null; away_score?: number | null }
 ) {
-  // FIX: Returns null for unplayed matches (Pending)
+  // If match or prediction score is missing, return null (Pending)
   if (match.home_score == null || match.away_score == null) return null;
   if (pred.home_score == null || pred.away_score == null) return null;
 
+  // Exact score match = 6 pts
   if (pred.home_score === match.home_score && pred.away_score === match.away_score) return 6;
 
   const predOutcome =
@@ -19,7 +20,9 @@ function calculatePoints(
   const actOutcome =
     match.home_score > match.away_score ? "home" : match.home_score < match.away_score ? "away" : "draw";
 
+  // Correct outcome = 3 pts
   if (predOutcome === actOutcome) return 3;
+  
   return 0;
 }
 
@@ -38,23 +41,25 @@ export async function GET(
     const userData = userSnap.data() || {};
     const user = { id: userSnap.id, ...userData } as any;
 
-    // 2. Fetch Rounds (Weeks)
+    // 2. Fetch Rounds
     const roundsSnap = await db.collection("rounds").orderBy("order", "asc").get();
 
-    // 3. Fetch All Matches
+    // 3. Fetch Matches
     const matchesSnap = await db.collection("matches").orderBy("order", "asc").get();
 
-    // 4. Fetch Predictions (Flexible field names)
+    // 4. Fetch Predictions
     let predSnap = await db.collection("predictions").where("user_id", "==", userId).get();
-    if (predSnap.empty) predSnap = await db.collection("predictions").where("userId", "==", userId).get();
+    if (predSnap.empty) {
+      predSnap = await db.collection("predictions").where("userId", "==", userId).get();
+    }
 
-    // 5. Fetch Double Picks (Flexible field names)
+    // 5. Fetch Double Picks
     let doubleSnap = await db.collection("double_picks").where("user_id", "==", userId).get();
-    if (doubleSnap.empty) doubleSnap = await db.collection("double_picks").where("userId", "==", userId).get();
+    if (doubleSnap.empty) {
+      doubleSnap = await db.collection("double_picks").where("userId", "==", userId).get();
+    }
 
     // --- Data Processing ---
-
-    // Maps for quick lookup
     const matchesMap = new Map<string, any>();
     matchesSnap.forEach((doc) => matchesMap.set(doc.id, { id: doc.id, ...doc.data() }));
 
@@ -95,18 +100,17 @@ export async function GET(
           let basePoints = 0;
 
           if (pred) {
-            const pHome = Number(pred.home_score);
-            const pAway = Number(pred.away_score);
-            
-            basePoints = calculatePoints({ home_score: pHome, away_score: pAway }, matchData);
+            // FIX: Pass values directly (even if null) to calculatePoints
+            basePoints = calculatePoints({ 
+              home_score: pred.home_score, 
+              away_score: pred.away_score 
+            }, matchData);
             
             if (basePoints !== null) {
               points = basePoints * (isDoubled ? 2 : 1);
+              totalPoints += points;
             }
           }
-
-          // Add to total if played
-          if (points !== null) totalPoints += points;
 
           return {
             id: matchId,
@@ -145,7 +149,7 @@ export async function GET(
     return NextResponse.json({
       user: { id: user.id, username: user.username },
       totalPoints,
-      rounds: roundsWithMatches, // Returns array of Weeks instead of flat list
+      rounds: roundsWithMatches,
     });
 
   } catch (error) {
